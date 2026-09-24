@@ -1,6 +1,7 @@
 (env
  (dev
-  (flags (:standard -warn-error -a))))
+  (flags
+   (:standard -warn-error -a))))
 
 (executable
  (name main)
