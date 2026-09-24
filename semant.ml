@@ -58,12 +58,12 @@ let rec infertype_expr env expr =
 | Ast.Call {fname; args} ->
   (match Env.lookup_var_fun env fname with
    | Env.Fun (TAst.FunTyp {ret = (TAst.RetTyp t as ret); params}) ->
-     let typed_args = List.map (infertype_expr env) args in
-     let param_types = List.map (fun (TAst.Param {typ; _}) -> typ) params in
-     if List.map snd typed_args <> param_types then
+     let t_args = List.map (infertype_expr env) args in
+     let t_param = List.map (fun (TAst.Param {typ; _}) -> typ) params in
+     if List.map snd t_args <> t_param then
        failwith "error in Call"
      else
-       (TAst.Call {fname = tident fname; args = List.map fst typed_args; tp = ret}, t)
+       (TAst.Call {fname = tident fname; args = List.map fst t_args; tp = ret}, t)
    | Env.Fun _ -> failwith "void call cannot be used as a value"
    | Env.Var _ -> failwith "only functions can be called")
 
@@ -76,7 +76,7 @@ and infertype_lval env lvl =
 (* checks that an expression has the required type tp by inferring the type and comparing it to tp. *)
 and typecheck_expr env expr tp =
   let texpr, texprtp = infertype_expr env expr in
-if texprtp <> tp then failwith "Type mismatch";
+if texprtp <> tp then failwith "type mismatch";
   texpr
 
 (* should check the validity of a statement and produce the corresponding typed statement. Should use typecheck_expr and/or infertype_expr as necessary. *)
@@ -88,7 +88,7 @@ let rec typecheck_statement env stm =
     | Some t ->
       let expected_tp = typecheck_typ t in
       if tfbody <> expected_tp then
-        failwith "Variable initializer has the wrong type"
+        failwith "Variable has the wrong type"
       else
         expected_tp
     | None -> tfbody
@@ -101,15 +101,15 @@ let rec typecheck_statement env stm =
     | Some (Ast.Call {fname; args}) -> (
       match Env.lookup_var_fun env fname with
       | Env.Fun (TAst.FunTyp {ret; params}) ->
-        let typed_args = List.map (infertype_expr env) args in
-        let param_types = List.map (fun (TAst.Param {typ; _}) -> typ) params in
-        if List.map snd typed_args <> param_types then
-          failwith "Type error: Call arguments do not match function parameters"
+        let t_args = List.map (infertype_expr env) args in
+        let t_param = List.map (fun (TAst.Param {typ; _}) -> typ) params in
+        if List.map snd t_args <> t_param then
+          failwith "error: arguments do not match function parameters"
         else
-          Some (TAst.Call {fname = tident fname; args = List.map fst typed_args; tp = ret})
-      | Env.Var _ -> failwith "Only functions can be called")
+          Some (TAst.Call {fname = tident fname; args = List.map fst t_args; tp = ret})
+      | Env.Var _ -> failwith "only functions can be called")
     | Some (Ast.Assignment _ as e) -> Some (fst (infertype_expr env e))
-    | Some _ -> failwith "Only assignments and calls are valid expression statements"
+    | Some _ -> failwith "only assign and calls are valid statements"
     | None -> None
   in
   (TAst.ExprStm {expr = tex}, env)
