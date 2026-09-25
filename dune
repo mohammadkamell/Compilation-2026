@@ -1,7 +1,8 @@
 (env
  (dev
-  (flags (:standard -warn-error -a))))
+  (flags
+   (:standard -warn-error -a))))
 
-(executables
- (names main test_codegen)
+(executable
+ (name main)
  (libraries yojson ppx_yojson_conv_lib printbox printbox-text cmdliner))
