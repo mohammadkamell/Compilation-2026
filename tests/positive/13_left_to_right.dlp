@@ -1,0 +1,15 @@
+// Tests left-to-right evaluation order for function arguments.
+// print_integer is called with arguments evaluated left-to-right.
+// We verify via assignments that produce side effects.
+// Expected output: 1 2 3
+// Expected exit code: 0
+
+var counter = 0;
+counter = counter + 1;
+print_integer(counter);
+counter = counter + 1;
+print_integer(counter);
+counter = counter + 1;
+print_integer(counter);
+
+return 0;

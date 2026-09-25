@@ -1,0 +1,5 @@
+// NEGATIVE TEST: Return expression has wrong type.
+// Semantic error: Phase 1 return must be int, but bool is returned.
+// Expected: semantic error, compiler returns None.
+
+return true;

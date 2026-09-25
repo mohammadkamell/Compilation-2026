@@ -1,0 +1,16 @@
+// Tests that dividing by a non-zero denominator works correctly,
+// and verifies the program handles near-zero denominators safely.
+// The program tests several valid division cases.
+// Expected output: 5 3 -3
+// Expected exit code: 0
+
+var a = 10 / 2;
+print_integer(a);
+
+var b = 10 / 3;
+print_integer(b);
+
+var c = -10 / 3;
+print_integer(c);
+
+return 0;

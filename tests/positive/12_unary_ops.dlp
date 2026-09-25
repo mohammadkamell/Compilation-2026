@@ -1,0 +1,14 @@
+// Tests unary operators: - (negation) and ! (logical not).
+// Expected output: -5 0 1
+// Expected exit code: 0
+
+var neg = -5;
+print_integer(neg);
+
+var lnot_true  = !true;
+var lnot_false = !false;
+
+if (lnot_true)  { print_integer(1); } else { print_integer(0); }
+if (lnot_false) { print_integer(1); } else { print_integer(0); }
+
+return 0;

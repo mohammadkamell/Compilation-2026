@@ -1,0 +1,9 @@
+// NEGATIVE TEST: Variable used outside its declaring block scope.
+// Semantic error: inner is declared inside the block and not visible outside.
+// Expected: semantic error, compiler returns None.
+
+{
+    var inner = 5;
+}
+print_integer(inner);
+return 0;

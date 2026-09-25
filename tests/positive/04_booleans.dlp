@@ -1,0 +1,25 @@
+// Tests boolean operators && and ||, plus equality == and !=
+// Expected output: 1 0 1 1 0
+// Expected exit code: 0
+
+// &&: true && true = true
+var and_tt = true && true;
+if (and_tt) { print_integer(1); } else { print_integer(0); }
+
+// &&: true && false = false
+var and_tf = true && false;
+if (and_tf) { print_integer(1); } else { print_integer(0); }
+
+// ||: false || true = true
+var or_ft = false || true;
+if (or_ft) { print_integer(1); } else { print_integer(0); }
+
+// ==: 3 == 3 = true
+var eq_res = 3 == 3;
+if (eq_res) { print_integer(1); } else { print_integer(0); }
+
+// !=: 3 != 3 = false
+var neq_res = 3 != 3;
+if (neq_res) { print_integer(1); } else { print_integer(0); }
+
+return 0;

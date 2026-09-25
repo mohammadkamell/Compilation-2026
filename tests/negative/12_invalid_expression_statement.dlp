@@ -1,0 +1,7 @@
+// NEGATIVE TEST: Bare arithmetic expression as a statement.
+// Semantic error: only assignment and function-call expressions are
+//                 valid as expression statements.
+// Expected: semantic error, compiler returns None.
+
+1 + 2;
+return 0;
