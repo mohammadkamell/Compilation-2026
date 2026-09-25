@@ -1,0 +1,7 @@
+// NEGATIVE TEST: Equality comparison between mismatched types.
+// Semantic error: == requires both operands to have the same type.
+//                 int and bool are different types.
+// Expected: semantic error, compiler returns None.
+
+var x = 1 == true;
+return 0;

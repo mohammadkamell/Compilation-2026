@@ -1,0 +1,10 @@
+// Tests standard library calls: print_integer and read_integer.
+// For automated testing we only test print_integer (read_integer requires stdin).
+// Expected output: 7 42
+// Expected exit code: 0
+
+print_integer(7);
+var n = 42;
+print_integer(n);
+
+return 0;

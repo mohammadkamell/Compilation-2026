@@ -1,0 +1,24 @@
+// Tests short-circuit evaluation of && and ||.
+//
+// For &&: if left is false, right must NOT be evaluated.
+// For ||: if left is true, right must NOT be evaluated.
+//
+// We verify short-circuit by using a variable that would be modified
+// by the right-hand side if it were evaluated.
+//
+// Expected output: 0 1
+// Expected exit code: 0
+
+// Test &&: false && ...
+// The right side would assign side_effect = 1, but should not run.
+var side_effect = 0;
+var dummy1 = false && (side_effect = 1) == (side_effect = 1);
+if (side_effect == 0) { print_integer(0); } else { print_integer(1); }
+
+// Test ||: true || ...
+// The right side would assign side_effect = 99, but should not run.
+var side_effect2 = 1;
+var dummy2 = true || (side_effect2 = 99) == (side_effect2 = 99);
+if (side_effect2 == 1) { print_integer(1); } else { print_integer(0); }
+
+return 0;

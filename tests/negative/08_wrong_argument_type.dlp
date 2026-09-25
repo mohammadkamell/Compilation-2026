@@ -1,0 +1,6 @@
+// NEGATIVE TEST: Function call with argument of wrong type.
+// Semantic error: print_integer expects int, but receives bool.
+// Expected: semantic error, compiler returns None.
+
+print_integer(true);
+return 0;

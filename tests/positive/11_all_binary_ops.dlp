@@ -1,0 +1,40 @@
+// Tests all 13 binary operators in one program.
+// Arithmetic: + - * / %
+// Relational: < <= > >=
+// Equality: == !=
+// Boolean: && ||
+// Expected exit code: 0
+
+var plus  = 2 + 3;      // 5
+var minus = 5 - 2;      // 3
+var mul   = 4 * 3;      // 12
+var div   = 10 / 3;     // 3
+var rem   = 10 % 3;     // 1
+
+print_integer(plus);
+print_integer(minus);
+print_integer(mul);
+print_integer(div);
+print_integer(rem);
+
+var lt  = 1 < 2;
+var le  = 2 <= 2;
+var gt  = 3 > 2;
+var ge  = 3 >= 3;
+
+if (lt)  { print_integer(1); } else { print_integer(0); }
+if (le)  { print_integer(1); } else { print_integer(0); }
+if (gt)  { print_integer(1); } else { print_integer(0); }
+if (ge)  { print_integer(1); } else { print_integer(0); }
+
+var eq  = 5 == 5;
+var neq = 5 != 6;
+if (eq)  { print_integer(1); } else { print_integer(0); }
+if (neq) { print_integer(1); } else { print_integer(0); }
+
+var land = true && true;
+var lor  = false || true;
+if (land) { print_integer(1); } else { print_integer(0); }
+if (lor)  { print_integer(1); } else { print_integer(0); }
+
+return 0;

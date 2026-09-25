@@ -1,0 +1,6 @@
+// NEGATIVE TEST: Arithmetic operator applied to boolean operand.
+// Semantic error: + requires integer operands, bool is not int.
+// Expected: semantic error, compiler returns None.
+
+var x = true + 1;
+return 0;

@@ -223,3 +223,4 @@ let codegen_prog (prog: T.program) : L.prog =
     fdecls = [ (Sym.symbol "dolphin_main", 
                   {fty = ([], L.I64); param = []; cfg})] 
   }
+

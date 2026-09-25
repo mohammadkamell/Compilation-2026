@@ -1,0 +1,6 @@
+// NEGATIVE TEST: Program does not end with a return statement.
+// Semantic error: Phase 1 programs must end with an integer return.
+// Expected: semantic error, compiler returns None.
+
+var x = 10;
+print_integer(x);

@@ -1,0 +1,6 @@
+// NEGATIVE TEST: Variable declaration with type annotation mismatch.
+// Semantic error: annotation says int, but initializer is bool.
+// Expected: semantic error, compiler returns None.
+
+var x : int = true;
+return 0;

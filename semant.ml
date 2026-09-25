@@ -1,3 +1,5 @@
+exception TypeError of string list
+
 module TAst = TypedAst
 
 let typecheck_typ = function
@@ -149,6 +151,3 @@ let typecheck_prog prg =
   | TAst.ReturnStm _ :: _ -> tstms
   | [] -> failwith "program is empty"
   | _ -> failwith "program must have a return statement"
-
-
-
