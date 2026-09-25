@@ -142,7 +142,13 @@ and typecheck_statement_seq env stms =
   (tstms, result_env)
 
 (* the initial environment should include all the library functions, no local variables, and no errors. *)
-let initial_environment = Env.make_env []
+let initial_environment = Env.make_env [
+  ("print_integer",
+    TAst.FunTyp {ret = TAst.Void;
+                 params = [TAst.Param {paramname = TAst.Ident {sym = Symbol.symbol "n"}; typ = TAst.Int}]});
+  ("read_integer",
+    TAst.FunTyp {ret = TAst.RetTyp TAst.Int; params = []});
+]
 
 (* should check that the program (sequence of statements) ends in a return statement and make sure that all statements are valid as described in the assignment. Should use typecheck_statement_seq. *)
 let typecheck_prog prg =

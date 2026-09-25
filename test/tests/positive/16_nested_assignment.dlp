@@ -1,0 +1,15 @@
+// POSITIVE TEST: Chained/nested assignments and use in expressions.
+// x is assigned multiple times; each assignment updates the stored value.
+// Expected output: 5 15 30
+// Expected exit code: 0
+
+var x = 5;
+print_integer(x);
+
+x = x + 10;
+print_integer(x);
+
+x = x * 2;
+print_integer(x);
+
+return 0;

@@ -2,7 +2,3 @@
  (dev
   (flags
    (:standard -warn-error -a))))
-
-(executable
- (name main)
- (libraries yojson ppx_yojson_conv_lib printbox printbox-text cmdliner))

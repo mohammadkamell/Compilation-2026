@@ -1,0 +1,4 @@
+(executable
+ (name test_codegen)
+ (modules test_codegen)
+ (libraries util ir backend))

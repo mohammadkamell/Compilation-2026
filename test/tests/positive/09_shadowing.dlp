@@ -1,0 +1,21 @@
+// POSITIVE TEST: Variable shadowing across multiple scopes.
+// Outer x = 10, inner x = 20 (shadows outer), after block x = 10 again.
+// A second block re-shadows x with a bool to test type-independent shadowing.
+// Expected output: 20 10 1
+// Expected exit code: 0
+
+var x = 10;
+{
+    var x = 20;
+    print_integer(x);
+}
+print_integer(x);
+
+{
+    var x = true;
+    if (x) {
+        print_integer(1);
+    }
+}
+
+return 0;
