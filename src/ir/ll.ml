@@ -1,6 +1,4 @@
-(* -- Use this in your solution without modifications *)
-
-(* LLVM--: a simplified subset of the LLVM IR, based on  S. Zdancewic's
+(* LLVM--: a simplified subset of the LLVM IR, based on  S. Zdancewic's 
 LLVMlite at UPenn *)
 
 module S = Symbol
@@ -14,8 +12,8 @@ type lbl = S.symbol  (* Labels             *)
 (* LLVM IR types *)
 type ty
   = Void                (* void                *)
-  | I1 | I8 | I32 | I64       (* integer types       *)
-  | Ptr of ty           (* t*                  *)
+  | I1 | I8 | I32 | I64 (* integer types       *)
+  | Ptr                 (* pointer type        *)
   | Struct of ty list   (* {t1, t2, ... , tn } *)
   | Array of int * ty   (* [NNN x t]           *)
   | Fun of fty          (* t1, ...., tn -> tr  *)
@@ -27,8 +25,8 @@ type operand
   = Null              (* null pointer        *)
   | IConst64 of int64 (* integer constant    *)
   | IConst32 of int32 (* integer constant    *)
-  | IConst8 of char  (* integer constant    *)
-  | BConst of bool    (* boolean constant    *)
+  | IConst8 of char   (* integer constant    *)
+  | IConst1 of bool    (* boolean constant    *)
   | Gid of gid        (* A global identifier *)
   | Id of uid         (* A local identifier  *)
 
@@ -49,10 +47,8 @@ type insn
   | Store of ty * operand * operand            (* store ty %t, ty* %u                *)
   | Icmp of cnd * ty * operand * operand       (* icmp %s ty %s, %s                  *)
   | Call of ty * operand * (ty * operand) list (* fn (%1, %2, ...)                   *)
-  | Bitcast of ty * operand * ty               (* bitcast ty1 %u to ty2              *)
   | Gep of ty * operand * operand list         (* getelementptr ty* %u, i64 %vi, ... *)
-  | Zext of ty * operand * ty                  (* zext ty1 %o to ty2                 *)
-  | Ptrtoint of ty * operand * ty              (* ptrtoint ty1 %o to ty2             *)
+  | Ptrtoint of operand * ty                   (* ptrtoint ptr %o to ty2             *)
   | PhiNode of ty * (operand * lbl) list       (* phi ty [op1, br1], ... [opn, brn]  *)
   | Comment of string                          (* ; %s                               *)
 
@@ -116,7 +112,7 @@ let rec string_of_ty (t:ty):string =
     | I8           -> "i8"
     | I32          -> "i32"
     | I64          -> "i64"
-    | Ptr t'       -> (string_of_ty t')^"*"
+    | Ptr          -> "ptr"
     | Struct ts    -> "{ " ^ (mapcat ", " string_of_ty ts) ^ " }"
     | Array (n, t) -> "[" ^  (string_of_int n) ^ " x " ^  (string_of_ty t) ^ "]"
     | Fun (ts, t)  -> (string_of_ty t) ^  "( " ^ (mapcat ", " string_of_ty ts) ^ " )"
@@ -128,12 +124,12 @@ let sot = string_of_ty
 
 
 let string_of_operand (opr:operand): string =
-  match opr with
+  match opr with 
       Null      -> "null"
     | IConst64 i   -> Int64.to_string i
     | IConst32 i   -> Int32.to_string i
     | IConst8 i   -> string_of_int (Char.code i)
-    | BConst b   -> if b then "1" else "0"
+    | IConst1 b   -> if b then "1" else "0"
     | Gid g     -> "@" ^ (S.name g)
     | Id u      -> "%" ^ (S.name u)
 
@@ -147,7 +143,7 @@ let string_of_bop (b: bop): string =
   match b with
       Add -> "add" | Sub  -> "sub"  | Mul -> "mul"   |
       Shl -> "shl" | Lshr -> "lshr" | Ashr -> "ashr" |
-      And -> "and" | Or   -> "or"   | Xor -> "xor"   |
+      And -> "and" | Or   -> "or"   | Xor -> "xor"  | 
       SDiv -> "sdiv" | SRem -> "srem"
 
 let string_of_cnd (c:cnd): string =
@@ -170,33 +166,22 @@ let string_of_insn (ins:insn) : string =
           ; sot t; soo o1^"," ; soo o2 ]
       | Alloca t              -> "alloca " ^ (sot t)
       | Load (t, opr)         -> concwsp [ "load"
-          ; sot t ^"," ; sot (Ptr t); soo opr]
+          ; sot t ^"," ; sot Ptr; soo opr]
       | Store (t, os, od)     -> concwsp [ "store"
-          ; sot t; soo os ^"," ; sot (Ptr t); soo od]
+          ; sot t; soo os ^"," ; sot Ptr; soo od]
       | Icmp (c, t, o1, o2)   -> concwsp [ "icmp"
           ; string_of_cnd c; sot t ; soo o1^"," ; soo o2]
       | Call (t, opr, oa)     -> concwsp [ "call"
           ; sot t
           ; soo opr
           ; parens (mapcat ", " soop oa) ]
-      | Bitcast (t1, opr, t2) -> concwsp [ "bitcast"
-          ; sot t1
-          ; soo opr
-          ; "to"
-          ; sot t2]
       | Gep (t, opr, oi)      -> concwsp [ "getelementptr"
           ; sot t^","
-          ; sot (Ptr t)
+          ; sot Ptr
           ; soo opr ^","
           ; mapcat ", " string_of_gep_index oi]
-
-      | Zext (t, o1, t2)      -> concwsp [ "zext"
-          ; sot t
-          ; soo o1
-          ; "to"
-          ; sot t2]
-      | Ptrtoint (t, o1, t2)  -> concwsp [ "ptrtoint"
-          ; sot (Ptr t)
+      | Ptrtoint (o1, t2)  -> concwsp [ "ptrtoint"
+          ; sot Ptr
           ; soo o1
           ; "to"
           ; sot t2]
@@ -231,33 +216,33 @@ let string_of_block (b:block) : string =
 let string_of_cfg ((e, bs): cfg): string =
   let string_of_named_block (l, b) = (S.name l ) ^ ":\n" ^ string_of_block b
   in (string_of_block e) ^ "\n" ^ ( (mapcat "\n" string_of_named_block bs) ^^ "\n" )
-
+  
 
 let string_of_named_fdecl (( g, f): gid * fdecl): string =
   let string_of_arg (t, u) = (sot t) ^ " %"^(S.name u) in
-  let (ts, t) = f.fty
+  let (ts, t) = f.fty 
   in concwsp [ "define"
       ; sot t
       ; "@"^(S.name g)
       ; parens ( mapcat ", " string_of_arg (Stdlib.List.combine ts f.param ))
       ; "{\n"^ (string_of_cfg (f.cfg) ) ^ "}\n"]
+  
 
-
-let ll_encode s =
-  let explode s = String.to_seq s |> Stdlib.List.of_seq in
-  let implode s = Stdlib.List.to_seq s |> String.of_seq in
-  let rec ase ls = match ls with
+let ll_encode s = 
+  let explode s = String.to_seq s |> Stdlib.List.of_seq in 
+  let implode s = Stdlib.List.to_seq s |> String.of_seq in   
+  let rec ase ls = match ls with     
       []  -> []
     | ('\\'::cs) -> '\\' :: '\\':: (ase cs)
-    | ('\"'::cs) ->
-        let charsc = Format.asprintf "%02X" (Char.code('\"')) in
+    | ('\"'::cs) -> 
+        let charsc = Format.asprintf "%02X" (Char.code('\"')) in 
         '\\' :: (explode charsc) @ (ase cs)
-    | (c::cs) ->
-        let ordc = Char.code c in
-        let charsc = Format.asprintf "%02X" ordc in
-        if 32 <= ordc && ordc < 128 then c:: (ase cs)
-        else '\\':: (explode charsc) @ (ase cs) in
-  s |> explode |> ase |> implode
+    | (c::cs) -> 
+        let ordc = Char.code c in 
+        let charsc = Format.asprintf "%02X" ordc in 
+        if 32 <= ordc && ordc < 128 then c:: (ase cs) 
+        else '\\':: (explode charsc) @ (ase cs) in    
+  s |> explode |> ase |> implode 
 
 let rec string_of_ginit ( gi: ginit): string =
   match gi with
@@ -273,7 +258,7 @@ and string_of_gdecl ((t, gi):gdecl): string =
 let string_of_named_gdecl ((g, gd) : gid *  gdecl) : string =
   "@"^(S.name g) ^ " = global " ^ (string_of_gdecl gd)
 
-let string_of_named_ext_gdecl ((g, tp) : gid *  ty) : string =
+let string_of_named_ext_gdecl ((g, tp) : gid *  ty) : string = 
   "@"^(S.name g) ^ " = external global " ^ (sot tp)
 
 let string_of_ext_fun (g, (paramstyp, rettyp)) : string =
