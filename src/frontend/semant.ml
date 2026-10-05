@@ -80,6 +80,21 @@ and typecheck_expr env expr tp =
   if texprtp <> tp then failwith "type mismatch";
   texpr
 
+(* Check an expression whose result is discarded, including void calls. *)
+and typecheck_discarded_expr env expr =
+  match expr with
+  | Ast.Call {fname; args} ->
+    (match Env.lookup_var_fun env fname with
+     | Env.Fun (TAst.FunTyp {ret; params}) ->
+       let t_args = List.map (infertype_expr env) args in
+       let t_params = List.map (fun (TAst.Param {typ; _}) -> typ) params in
+       if List.map snd t_args <> t_params then
+         failwith "error: arguments do not match function parameters"
+       else
+         TAst.Call {fname = tident fname; args = List.map fst t_args; tp = ret}
+     | Env.Var _ -> failwith "only functions can be called")
+  | _ -> fst (infertype_expr env expr)
+
 (* --------------------------------------------------------------------------
    Declaration helpers
    -------------------------------------------------------------------------- *)
@@ -123,7 +138,7 @@ and typecheck_declaration_block env (Ast.DeclBlock declarations) =
 and typecheck_for_init env = function
   | Ast.FIExpr expr ->
     (* expression just needs to be well-typed; any type is OK *)
-    let typed_expr, _ = infertype_expr env expr in
+    let typed_expr = typecheck_discarded_expr env expr in
     (TAst.FIExpr typed_expr, env)
   | Ast.FIDecl decl_block ->
     let typed_block, new_env = typecheck_declaration_block env decl_block in
@@ -147,16 +162,7 @@ and typecheck_statement env stm =
   | Ast.ExprStm {expr} ->
     let tex =
       match expr with
-      | Some (Ast.Call {fname; args}) ->
-        (match Env.lookup_var_fun env fname with
-         | Env.Fun (TAst.FunTyp {ret; params}) ->
-           let t_args   = List.map (infertype_expr env) args in
-           let t_params = List.map (fun (TAst.Param {typ; _}) -> typ) params in
-           if List.map snd t_args <> t_params then
-             failwith "error: arguments do not match function parameters"
-           else
-             Some (TAst.Call {fname = tident fname; args = List.map fst t_args; tp = ret})
-         | Env.Var _ -> failwith "only functions can be called")
+      | Some (Ast.Call _ as e) -> Some (typecheck_discarded_expr env e)
       | Some (Ast.Assignment _ as e) -> Some (fst (infertype_expr env e))
       | Some _ -> failwith "only assign and calls are valid statements"
       | None -> None
@@ -215,8 +221,7 @@ and typecheck_statement env stm =
       match update with
       | None      -> None
       | Some expr ->
-        let texpr, _ = infertype_expr for_env expr in
-        Some texpr
+        Some (typecheck_discarded_expr for_env expr)
     in
     (* Step 4: body checked in loop context built from for_env *)
     let body_env  = Env.enter_loop for_env in
@@ -230,14 +235,14 @@ and typecheck_statement env stm =
     if Env.is_inside_loop env then
       (TAst.BreakStm, env)
     else
-      failwith "break statement outside of a loop"
+      raise (TypeError [Errors.error_to_string Errors.BreakOutsideLoop])
 
   (* --- continue --- *)
   | Ast.ContinueStm ->
     if Env.is_inside_loop env then
       (TAst.ContinueStm, env)
     else
-      failwith "continue statement outside of a loop"
+      raise (TypeError [Errors.error_to_string Errors.ContinueOutsideLoop])
 
 (* should use typecheck_statement to check the block of statements. *)
 and typecheck_statement_seq env stms =

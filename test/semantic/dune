@@ -1,0 +1,4 @@
+(test
+ (name test_semant)
+ (modules test_semant)
+ (libraries frontend ir util))
