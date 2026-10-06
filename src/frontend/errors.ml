@@ -5,9 +5,13 @@ module TPretty = TypedPretty
 
 type error =
 | TypeMismatch of {expected : TAst.rettyp; actual : TAst.rettyp}
+| BreakOutsideLoop
+| ContinueOutsideLoop
 (* other errors to be added as needed. *)
 
 (* Useful for printing errors *)
 let error_to_string err =
   match err with
+  | BreakOutsideLoop -> "break statement outside of a loop."
+  | ContinueOutsideLoop -> "continue statement outside of a loop."
   | TypeMismatch {expected; actual; _} -> Printf.sprintf "Type mismatch: expected %s but found %s." (TPretty.rettyp_to_string expected) (TPretty.rettyp_to_string actual)

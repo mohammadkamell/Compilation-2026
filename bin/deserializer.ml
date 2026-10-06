@@ -1,6 +1,7 @@
 (* -- Use this in your solution without modifications *)
 
 open Ppx_yojson_conv_lib.Yojson_conv.Primitives
+
 let ident_of_yojson =
   function
   | `List [`String "Ident"; `Assoc bnds] ->
@@ -73,18 +74,43 @@ and lval_of_yojson =
     Ast.Var ident_arg
   | _ -> failwith (Printf.sprintf "Ill-formed lval JSON")
 
+let single_declaration_of_yojson =
+  function
+  | `List [`String "Declaration"; `Assoc bnds] ->
+    let name_field = ident_of_yojson (List.assoc "name" bnds) in
+    let tp_field = option_of_yojson typ_of_yojson (List.assoc "tp" bnds) in
+    let body_field = expr_of_yojson (List.assoc "body" bnds) in
+    Ast.Declaration {name = name_field ; tp = tp_field ; body = body_field}
+  | _ -> failwith (Printf.sprintf "Ill-formed single_declaration JSON")
+
+let declaration_block_of_yojson =
+  function
+  | `List [`String "DeclBlock"; `Assoc bnds_stm] ->
+    let single_declaration_list_arg =
+      list_of_yojson single_declaration_of_yojson (List.assoc "declarations" bnds_stm)
+    in
+    Ast.DeclBlock single_declaration_list_arg
+  | _ -> failwith (Printf.sprintf "Ill-formed single_declaration JSON")
+
+let for_init_of_yojson =
+  function
+  | `List [`String "FIExpr"; fiexpr_expr_arg] ->
+    let expr_arg =
+      expr_of_yojson fiexpr_expr_arg
+    in
+    Ast.FIExpr expr_arg
+  | `List [`String "FIDecl"; fidecl_declaration_block_arg] ->
+    let declaration_block_arg =
+      declaration_block_of_yojson fidecl_declaration_block_arg
+    in
+    Ast.FIDecl declaration_block_arg
+  | _ -> failwith (Printf.sprintf "Ill-formed for_init JSON")
+
 let rec statement_of_yojson =
   function
-  | `List [`String "DeclStm"; `List [`String "DeclBlock"; `Assoc bnds_stm]] ->
-    begin
-      match List.assoc "declarations" bnds_stm with
-      | `List [`List [`String "Declaration"; `Assoc bnds] ] ->
-        let name_field = ident_of_yojson (List.assoc "name" bnds) in
-        let tp_field = option_of_yojson typ_of_yojson (List.assoc "tp" bnds) in
-        let body_field = expr_of_yojson (List.assoc "body" bnds) in
-        Ast.VarDeclStm {name = name_field ; tp = tp_field ; body = body_field}
-      | _ -> failwith (Printf.sprintf "Ill-formed statement declaration JSON")
-    end
+  | `List [`String "DeclStm"; vardeclstm_declaration_block_arg ] ->
+    let declaration_block_arg = declaration_block_of_yojson vardeclstm_declaration_block_arg in
+    Ast.VarDeclStm declaration_block_arg
   | `List [`String "ExprStm"; `Assoc bnds] ->
     let expr_field = option_of_yojson expr_of_yojson (List.assoc "expr" bnds) in
     Ast.ExprStm { expr = expr_field}
@@ -93,12 +119,24 @@ let rec statement_of_yojson =
     let thbr_field = statement_of_yojson (List.assoc "thbr" bnds) in
     let elbro_field = option_of_yojson statement_of_yojson (List.assoc "elbro" bnds) in
     Ast.IfThenElseStm {cond = cond_field ; thbr = thbr_field ; elbro = elbro_field}
+  | `List [`String "WhileStm"; `Assoc bnds] ->
+    let cond_field = expr_of_yojson (List.assoc "cond" bnds) in
+    let body_field = statement_of_yojson (List.assoc "body" bnds) in
+    Ast.WhileStm {cond = cond_field ; body = body_field}
+  | `List [`String "ForStm"; `Assoc bnds] ->
+    let init_field = option_of_yojson for_init_of_yojson (List.assoc "init" bnds) in
+    let cond_field = option_of_yojson expr_of_yojson (List.assoc "cond" bnds) in
+    let update_field = option_of_yojson expr_of_yojson (List.assoc "update" bnds) in
+    let body_field = statement_of_yojson (List.assoc "body" bnds) in
+    Ast.ForStm {init = init_field ; cond = cond_field ; update = update_field ; body = body_field}
+  | `List (`String "BreakStm"::_) -> BreakStm
+  | `List (`String "ContinueStm"::_) -> ContinueStm
   | `List [`String "CompoundStm"; `Assoc bnds] ->
     let stms_field = list_of_yojson statement_of_yojson (List.assoc "stms" bnds) in
     Ast.CompoundStm { stms = stms_field}
   | `List [`String "ReturnStm"; `Assoc bnds] ->
     let ret_field = expr_of_yojson (List.assoc "ret" bnds) in
-    ReturnStm { ret = ret_field}
+    Ast.ReturnStm { ret = ret_field}
   | _ -> failwith (Printf.sprintf "Ill-formed statement JSON")
 
 let program_of_yojson =

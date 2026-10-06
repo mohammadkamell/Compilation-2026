@@ -3,13 +3,14 @@ module Sym = Symbol
 
 type ident = Ident of {sym : Sym.symbol}
 
-type typ = Int | Bool | ErrorType
+type typ = | Int | Bool | ErrorType
 
 type rettyp = Void | RetTyp of typ
 
-type binop = Plus | Minus | Mul | Div | Rem | Lt | Le | Gt | Ge | Lor | Land | Eq | NEq
+type binop = | Plus | Minus | Mul | Div | Rem | Lt 
+  | Le | Gt | Ge | Lor | Land | Eq | NEq
 
-type unop = Neg | Lnot
+type unop = | Neg | Lnot
 
 type expr =
 | Integer of {int : int64}
@@ -22,10 +23,25 @@ type expr =
 and lval =
 | Var of {ident : ident; tp : typ}
 
+type single_declaration = Declaration of {name : ident; tp : typ; body : expr}
+
+type declaration_block = DeclBlock of single_declaration list
+
+type for_init =
+| FIDecl of declaration_block
+| FIExpr of expr
+
 type statement =
-| VarDeclStm of {name : ident; tp : typ; body : expr}
+| VarDeclStm of declaration_block
 | ExprStm of {expr : expr option}
 | IfThenElseStm of {cond : expr; thbr : statement; elbro : statement option}
+| WhileStm of {cond : expr; body : statement}
+| ForStm of { init : for_init option 
+            ; cond : expr option
+            ; update : expr option
+            ; body : statement }
+| BreakStm
+| ContinueStm
 | CompoundStm of {stms : statement list}
 | ReturnStm of {ret : expr}
 
