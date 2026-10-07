@@ -64,7 +64,7 @@ and type_of_lval (l : T.lval) : T.rettyp =
 let rec trans_expr (env: env) (e: T.expr) (b: B.cfg_builder) : B.cfg_builder * L.operand = 
   match e with 
   | T.Integer {int} -> (b, L.IConst64 int)
-  | T.Boolean {bool} -> (b, L.BConst bool)
+  | T.Boolean {bool} -> (b, L.IConst1 bool)
   | T.BinOp {left; op; right; _} ->
     (match op with
      | T.Plus | T.Minus | T.Mul ->
@@ -125,7 +125,7 @@ let rec trans_expr (env: env) (e: T.expr) (b: B.cfg_builder) : B.cfg_builder * L
       let b2  = 
         (match op with 
       | T.Neg -> B.add_insn(Some temp, L.Binop(L.Sub, L.I64, L.IConst64 0L, o)) b1
-      | T.Lnot -> B.add_insn(Some temp, L.Binop(L.Xor, L.I1, o, L.BConst true)) b1
+      | T.Lnot -> B.add_insn(Some temp, L.Binop(L.Xor, L.I1, o, L.IConst1 true)) b1
       )
       in 
       (b2, L.Id temp)
@@ -162,7 +162,7 @@ match args with
 
 
 
-let rec trans_stmt (env: env) (s: T.statement) (b: B.cfg_builder) : env * B.cfg_builder = 
+let rec trans_stmt (env: env) (break_lbl: L.lbl) (cont_lbl: L.lbl) (s: T.statement) (b: B.cfg_builder) : env * B.cfg_builder = 
   match s with 
   | T.ReturnStm {ret} ->
     let (b1, op) = trans_expr env ret b in
@@ -175,17 +175,19 @@ let rec trans_stmt (env: env) (s: T.statement) (b: B.cfg_builder) : env * B.cfg_
         let (b1, _) = trans_expr env e b in 
         (env, b1)
       | None ->  (env, b) )
-  | T.VarDeclStm {name = T.Ident {sym}; tp; body} -> 
-      let (b1, op1) = trans_expr env body b in 
-      let ll_typ = ll_type_of_typ tp in 
-      let fresh_slot = fresh (Sym.name sym) in 
-      let b2 = B.add_alloca (fresh_slot, ll_typ) b1 in
-      let b3 = B.add_insn (None, L.Store (ll_typ, op1, L.Id fresh_slot)) b2 in 
-      let new_env = Sym.Table.add sym (fresh_slot, ll_typ) env in 
-      (new_env, b3)
+  | T.VarDeclStm (T.DeclBlock decls) ->     
+    List.fold_left (fun (env_acc, b_acc) (T.Declaration {name = T.Ident {sym}; tp; body}) -> 
+     let (b1, op1) = trans_expr env_acc body b_acc in 
+     let ll_typ = ll_type_of_typ tp in
+     let fresh_slot = fresh (Sym.name sym) in 
+     let b2 = B.add_alloca (fresh_slot, ll_typ) b1 in 
+     let b3 = B.add_insn (None, L.Store (ll_typ, op1, L.Id fresh_slot)) b2 in  
+     let new_env = Sym.Table.add sym (fresh_slot, ll_typ) env_acc in 
+     (new_env, b3)) 
+     (env, b) decls
   | T.CompoundStm {stms} -> 
       let (_, b1) = 
-        List.fold_left (fun (env', b') s -> trans_stmt env' s b') (env,b) stms in 
+        List.fold_left (fun (env', b') s -> trans_stmt env' break_lbl cont_lbl s b') (env,b) stms in 
       (env, b1)
   | T.IfThenElseStm {cond; thbr; elbro} -> 
       let (b1, cond_op) = trans_expr env cond b in 
@@ -195,23 +197,72 @@ let rec trans_stmt (env: env) (s: T.statement) (b: B.cfg_builder) : env * B.cfg_
       let b2 = B.term_block (L.Cbr (cond_op, then_lbl, else_lbl)) b1 in 
       (* then branch *)
       let b3 = B.start_block then_lbl b2 in 
-      let (_, b4) = trans_stmt env thbr b3 in 
+      let (_, b4) = trans_stmt env break_lbl cont_lbl thbr b3 in 
       let b5 = B.term_block (L.Br merge_lbl) b4 in 
       (*else branch *)
       let b6 = B.start_block else_lbl b5 in 
       let b7 = 
         (match elbro with 
-        | Some elbr -> let (_,b') = trans_stmt env elbr b6 in b'
+        | Some elbr -> let (_,b') = trans_stmt env break_lbl cont_lbl elbr b6 in b'
         | None -> b6) in
       let b8 = B.term_block (L.Br merge_lbl) b7 in 
       let b9 = B.start_block merge_lbl b8 in 
-      (env, b9)  
+      (env, b9) 
+    | T.WhileStm {cond; body} -> 
+      let cond_lbl = fresh "loop_cond" in 
+      let body_lbl = fresh "loop_body" in
+      let end_lbl = fresh "loop_end" in
+      let b1 = B.term_block (L.Br cond_lbl) b in
+      let b2 = B.start_block cond_lbl b1 in
+      let (b3, cond_op) = trans_expr env cond b2 in     
+      let b4 = B.term_block (L.Cbr (cond_op, body_lbl, end_lbl)) b3 in
+      let b5 = B.start_block body_lbl b4 in     
+      let (_, b6) = trans_stmt env end_lbl cond_lbl body b5 in     
+      let b7 = B.term_block (L.Br cond_lbl) b6 in
+      let b8 = B.start_block end_lbl b7 in
+      (env, b8)
+    | T.ForStm {cond; init; update; body} -> 
+      let cond_lbl   = fresh "for_cond" in     
+      let body_lbl   = fresh "for_body" in     
+      let update_lbl = fresh "for_update" in
+      let end_lbl    = fresh "for_end" in 
+      let (env1, b1) = (match init with    
+      | Some (T.FIDecl db) -> trans_stmt env break_lbl cont_lbl (T.VarDeclStm db) b    
+      | Some (T.FIExpr e)  -> let (b', _) = trans_expr env e b in (env, b')    
+      | None -> (env, b)) in   
+      let b2 = B.term_block (L.Br cond_lbl) b1 in
+      let b3 = B.start_block cond_lbl b2 in     
+      let b5 = (match cond with 
+      | Some c -> 
+        let (b4, cond_op) = trans_expr env1 c b3 in 
+        B.term_block (L.Cbr (cond_op, body_lbl, end_lbl)) b4 
+        | None -> B.term_block (L.Br body_lbl) b3) in
+        let b6 = B.start_block body_lbl b5 in
+        let (_, b7) = trans_stmt env1 end_lbl update_lbl body b6 in
+        let b8 = B.term_block (L.Br update_lbl) b7 in
+        let b9 = B.start_block update_lbl b8 in 
+        let b11 =  
+          (match update with 
+          | Some u -> let (b10, _) = trans_expr env1 u b9 in b10 
+          | None -> b9) in 
+          let b12 = B.term_block (L.Br cond_lbl) b11 in 
+          let b13 = B.start_block end_lbl b12 in 
+          (env, b13)
+    | T.BreakStm -> let b1 = B.term_block (L.Br break_lbl) b in     
+          let b2 = B.start_block (fresh "after_break") b1 in 
+          (env, b2)
+    | T.ContinueStm -> 
+      let b1 = B.term_block (L.Br cont_lbl) b in     
+      let b2 = B.start_block (fresh "after_continue") b1 in     
+      (env, b2)
 
 
 
 
 let codegen_prog (prog: T.program) : L.prog = 
-  let (_, final_b) = List.fold_left (fun (env, b) s -> trans_stmt env s b)
+    let no_break = fresh "negative_break" in   
+    let no_cont  = fresh "negative_continue" in
+  let (_, final_b) = List.fold_left (fun (env, b) s -> trans_stmt env no_break no_cont s b)
   (empty_env, B.empty_cfg_builder) prog in 
   let cfg = B.get_cfg final_b in 
   { L.tdecls = [];
