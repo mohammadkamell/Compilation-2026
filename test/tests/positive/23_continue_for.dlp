@@ -1,0 +1,6 @@
+// continue in a for loop must still run the update (otherwise infinite loop).
+// Expected output: 1 3
+// Expected exit code: 0
+
+for (var i = 0; i < 5; i = i + 1) { if (i % 2 == 0) continue; print_integer(i); }
+return 0;

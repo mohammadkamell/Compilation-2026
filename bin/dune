@@ -1,4 +1,5 @@
 (executable
  (name main)
+ (public_name dolphin)
  (modules main deserializer compiler)
  (libraries util frontend ir backend yojson ppx_yojson_conv_lib printbox printbox-text cmdliner))

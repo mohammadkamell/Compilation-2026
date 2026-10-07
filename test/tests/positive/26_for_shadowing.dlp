@@ -1,0 +1,8 @@
+// For-loop variable shadows an outer variable; the outer value is restored after the loop.
+// Expected output: 0 1 100
+// Expected exit code: 0
+
+var i = 100;
+for (var i = 0; i < 2; i = i + 1) { print_integer(i); }
+print_integer(i);
+return 0;

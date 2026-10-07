@@ -1,15 +1,7 @@
-// Tests left-to-right evaluation order for function arguments.
-// print_integer is called with arguments evaluated left-to-right.
-// We verify via assignments that produce side effects.
-// Expected output: 1 2 3
+// Left-to-right evaluation of binary operands: left side runs first, so x becomes 1 then 2 -> 1*10 + 2 = 12 (right-to-left would give 21).
+// Expected output: 12
 // Expected exit code: 0
 
-var counter = 0;
-counter = counter + 1;
-print_integer(counter);
-counter = counter + 1;
-print_integer(counter);
-counter = counter + 1;
-print_integer(counter);
-
+var x = 0;
+print_integer((x = x + 1) * 10 + (x = x + 1));
 return 0;

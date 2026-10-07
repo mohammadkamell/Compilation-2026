@@ -1,0 +1,7 @@
+// for(;;) with no init, condition or update, terminated by break.
+// Expected output: 0 1 2
+// Expected exit code: 0
+
+var i = 0;
+for (;;) { if (i == 3) break; print_integer(i); i = i + 1; }
+return 0;

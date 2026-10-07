@@ -1,0 +1,7 @@
+// Dead code after break is never executed.
+// Expected output: 1
+// Expected exit code: 0
+
+while (true) { break; print_integer(5); }
+print_integer(1);
+return 0;

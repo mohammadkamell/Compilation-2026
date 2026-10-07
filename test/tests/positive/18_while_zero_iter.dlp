@@ -1,0 +1,8 @@
+// While loop whose condition is false from the start: body never runs.
+// Expected output: 5
+// Expected exit code: 0
+
+var i = 5;
+while (i < 3) { print_integer(i); i = i + 1; }
+print_integer(i);
+return 0;

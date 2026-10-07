@@ -1,0 +1,8 @@
+// For loop with an expression (not a declaration) as init: the variable lives on after the loop.
+// Expected output: 0 1 2
+// Expected exit code: 0
+
+var i = 10;
+for (i = 0; i < 2; i = i + 1) { print_integer(i); }
+print_integer(i);
+return 0;

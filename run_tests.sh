@@ -8,28 +8,58 @@ COMPILER="./_build/default/bin/main.exe"
 POSITIVE_DIR="test/tests/positive"
 NEGATIVE_DIR="test/tests/negative"
 
+PHASE=2
+
 pass=0
 fail=0
 
+RUNTIME="src/runtime/runtime.c"
+TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
+
 run_positive() {
     local f="$1"
-    if "$COMPILER" rescue --phase 1 "$f" > /dev/null 2>&1; then
-        printf "  %-50s \033[32mOK\033[0m\n" "$f"
-        pass=$((pass + 1))
+    local expected exp_code code actual
+    expected=$(sed -n 's|^// Expected output: *||p' "$f" | head -n 1)
+    exp_code=$(sed -n 's|^// Expected exit code: *||p' "$f" | head -n 1)
+    exp_code=${exp_code:-0}
+
+    if ! "$COMPILER" rescue --phase "$PHASE" "$f" > "$TMP/out.ll" 2> /dev/null; then
+        printf "  %-50s \033[31mFAILED (compile)\033[0m\n" "$f"; fail=$((fail + 1)); return
+    fi
+    if ! clang "$TMP/out.ll" "$RUNTIME" -o "$TMP/prog" -Wno-override-module 2> /dev/null; then
+        printf "  %-50s \033[31mFAILED (clang)\033[0m\n" "$f"; fail=$((fail + 1)); return
+    fi
+
+    timeout 5 "$TMP/prog" < /dev/null > "$TMP/actual" 2> /dev/null
+    code=$?
+    if [ "$code" -eq 124 ]; then
+        printf "  %-50s \033[31mTIMEOUT (infinite loop?)\033[0m\n" "$f"; fail=$((fail + 1)); return
+    fi
+
+    actual=$(echo $(cat "$TMP/actual"))
+    expected=$(echo $expected)
+    if [ "$actual" = "$expected" ] && [ "$code" -eq "$exp_code" ]; then
+        printf "  %-50s \033[32mOK\033[0m\n" "$f"; pass=$((pass + 1))
     else
-        printf "  %-50s \033[31mFAILED\033[0m\n" "$f"
+        printf "  %-50s \033[31mWRONG\033[0m (expected '%s' exit %s, got '%s' exit %s)\n" \
+               "$f" "$expected" "$exp_code" "$actual" "$code"
         fail=$((fail + 1))
     fi
 }
 
 run_negative() {
     local f="$1"
-    if "$COMPILER" rescue --phase 1 "$f" > /dev/null 2>&1; then
+    "$COMPILER" rescue --phase "$PHASE" "$f" > /dev/null 2>&1
+    local code=$?
+    if [ "$code" -eq 1 ]; then
+        printf "  %-50s \033[32mOK (rejected)\033[0m\n" "$f"
+        pass=$((pass + 1))
+    elif [ "$code" -eq 0 ]; then
         printf "  %-50s \033[31mUNEXPECTED OK\033[0m\n" "$f"
         fail=$((fail + 1))
     else
-        printf "  %-50s \033[32mOK (rejected)\033[0m\n" "$f"
-        pass=$((pass + 1))
+        printf "  %-50s \033[31mCRASH (exit %d)\033[0m\n" "$f" "$code"
+        fail=$((fail + 1))
     fi
 }
 

@@ -3,6 +3,9 @@ let compile_prog_from_ast (prog : Ast.program) : Ll.prog option =
   | exception Semant.TypeError errors ->
       List.iter (fun msg -> Printf.eprintf "%s\n" msg) errors;
       None
+  | exception Failure msg ->
+    Printf.eprintf "%s\n" msg ; 
+    None
   | typed_prog ->
       let ll_prog = Codegen.codegen_prog typed_prog in
       Some ll_prog

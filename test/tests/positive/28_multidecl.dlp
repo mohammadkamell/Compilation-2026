@@ -1,0 +1,9 @@
+// Multiple declarations in one statement; later ones use earlier ones.
+// Expected output: 2 5 1
+// Expected exit code: 0
+
+var x = 2, y = x + 3, b = y > 4;
+print_integer(x);
+print_integer(y);
+if (b) print_integer(1); else print_integer(0);
+return 0;
