@@ -2,4 +2,6 @@
  (name util)
  (wrapped false)
  (modules symbol location)
- (libraries printbox yojson ppx_yojson_conv_lib))
+ (libraries ppx_yojson_conv_lib printbox printbox-text)
+ (preprocess
+  (pps ppx_yojson_conv)))

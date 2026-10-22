@@ -4,5 +4,6 @@
  (modules ast semant env errors pretty typedPretty parser)
  (libraries util ir printbox printbox-text))
 
+(ocamllex lexer)
 (menhir
  (modules parser))

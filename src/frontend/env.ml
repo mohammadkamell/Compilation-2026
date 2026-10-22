@@ -11,7 +11,7 @@ type environment = {
   loop_depth : int;
 }
 
-let name_of (Ast.Ident {name}) = name
+let name_of (Ast.Ident {name; _}) = name
 
 (* create an initial environment with the given functions defined *)
 let make_env function_types =

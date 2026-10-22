@@ -2,3 +2,8 @@
  (name test_codegen)
  (modules test_codegen)
  (libraries util ir backend))
+
+(test
+ (name test_lexer)
+ (modules test_lexer)
+ (libraries util frontend printbox printbox-text))
