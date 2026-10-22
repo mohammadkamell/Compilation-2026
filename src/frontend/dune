@@ -5,4 +5,5 @@
  (libraries util ir printbox printbox-text))
 
 (menhir
- (modules parser))
+ (modules parser)
+ (flags --explain))
