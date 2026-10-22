@@ -11,5 +11,24 @@ let compile_prog_from_ast (prog : Ast.program) : Ll.prog option =
       Some ll_prog
 
 let compile_prog_from_filename (_filename : string) : Ll.prog option =
-  Printf.eprintf "compile_prog_from_filename: not implemented for Phase 1\n";
-  None
+  match open_in _filename with   
+  | exception Sys_error err_message ->       
+    Printf.eprintf "%s\n" err_message;       
+    None
+  | input_channel ->
+    let lexbuff = Lexing.from_channel input_channel in
+    let result =
+    match Parser.program Lexer.token lexbuff with
+      | exception Lexer.Error err_message ->         
+      Printf.eprintf "Lexer error -> %s\n" err_message;         
+      None     
+      | exception Parser.Error -> 
+        let position = lexbuff.Lexing.lex_curr_p in         
+        Printf.eprintf "Syntax error at line %d, column %d\n"           
+        position.Lexing.pos_lnum           
+        (position.Lexing.pos_cnum - position.Lexing.pos_bol);         
+        None     
+      | ast -> compile_prog_from_ast ast 
+     in   
+      close_in input_channel;  
+      result
