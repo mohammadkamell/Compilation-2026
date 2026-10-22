@@ -7,6 +7,7 @@ set -uo pipefail
 COMPILER="./_build/default/bin/main.exe"
 POSITIVE_DIR="test/tests/positive"
 NEGATIVE_DIR="test/tests/negative"
+ASSIGNMENT5_NEGATIVE_TEST_DIR="test/tests/assignment-05-tests"
 
 PHASE=3
 
@@ -75,7 +76,15 @@ done
 echo ""
 echo "=== NEGATIVE TESTS ==="
 for f in "$NEGATIVE_DIR"/*.dlp; do
-    run_negative "$f"
+  [ -e "$f" ] || continue
+  run_negative "$f"
+done
+
+echo ""
+echo "=== ASSIGNMENT 5 (NEGATIVE TESTS) ==="
+for f in "$ASSIGNMENT5_NEGATIVE_TEST_DIR"/*.dlp; do
+  [ -e "$f" ] || continue
+  run_negative "$f"
 done
 
 echo ""

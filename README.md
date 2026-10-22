@@ -40,6 +40,7 @@ All tools are pre-installed in the provided Docker Dev Container:
 │   └── tests/
 │       ├── positive/         # Valid Dolphin programs with expected output
 │       └── negative/         # Invalid programs (must be rejected by semant)
+│       └── assignment-05-tests/    # Negative tests for lexer and parser errors 
 ├── run_tests.sh      # End-to-end test runner for the test corpus
 ├── dune
 ├── dune-project
