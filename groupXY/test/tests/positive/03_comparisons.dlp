@@ -1,0 +1,23 @@
+// Tests integer comparison operators: < <= > >=
+// Each comparison produces a bool; we use if to print 1 or 0.
+// Expected output: 1 1 1 1 0 0
+// Expected exit code: 0
+var lt_res = 2 < 3;
+if (lt_res) { print_integer(1); } else { print_integer(0); }
+
+var le_eq_res = 3 <= 3;
+if (le_eq_res) { print_integer(1); } else { print_integer(0); }
+
+var gt_res = 5 > 4;
+if (gt_res) { print_integer(1); } else { print_integer(0); }
+
+var ge_res = 4 >= 4;
+if (ge_res) { print_integer(1); } else { print_integer(0); }
+
+var lt_false = 5 < 3;
+if (lt_false) { print_integer(1); } else { print_integer(0); }
+
+var gt_false = 2 > 4;
+if (gt_false) { print_integer(1); } else { print_integer(0); }
+
+return 0;

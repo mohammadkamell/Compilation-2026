@@ -1,0 +1,9 @@
+// NEGATIVE TEST: Function name shadowed by a local variable.
+// A local variable 'f' masks the function 'f', so calling f(12) is invalid.
+// (In this test, print_integer is a known function; we shadow it with a variable.)
+// Semantic error: print_integer is a variable (int), not callable.
+// Expected: semantic error, compiler returns None.
+
+var print_integer = 10;
+print_integer(12);
+return 0;

@@ -1,0 +1,8 @@
+// NEGATIVE TEST: If condition is not boolean.
+// Semantic error: condition must be bool, but integer 42 is provided.
+// Expected: semantic error, compiler returns None.
+
+if (42) {
+    print_integer(1);
+}
+return 0;

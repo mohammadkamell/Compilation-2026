@@ -1,0 +1,6 @@
+// NEGATIVE TEST: Boolean operator applied to integer operands.
+// Semantic error: && requires boolean operands, integers are not valid.
+// Expected: semantic error, compiler returns None.
+
+var x = 1 && 2;
+return 0;

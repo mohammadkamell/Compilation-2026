@@ -1,12 +1,13 @@
-# Dolphin Compiler — Phase 2
+# Dolphin Compiler — Phase 3
 
 A compiler for the Dolphin language that produces LLVM IR, built with OCaml and Dune.
 
-Phase 2 extends the language from Phase 1 with:
+Phase 3 extends the language from Phase 1 and Phase 2 with:
 
-- `while` loops and `for` loops (with optional init, condition and update)
-- `break` and `continue` statements
-- multiple variable declarations in one statement, e.g. `var x = 2, y = x + 3;`
+- Task 1: lexer with `ocamllex`
+- Task 2: conflict-free parser with Menhir 
+- Task 3: semantic errors now include locations 
+- Task 4: `compile_prog_from_filename` (lexer → parser → semantic analysis → codegen) and tests ported to `.dlp`
 
 ## Prerequisites
 
@@ -29,7 +30,7 @@ All tools are pre-installed in the provided Docker Dev Container:
 │   ├── frontend/     # AST, type-checker (Semant), Env, Errors, pretty-printers
 │   ├── ir/           # LLVM IR types (Ll), TypedAst
 │   ├── backend/      # Code generation (Codegen), CFG builder
-│   ├── util/         # Symbol table
+│   ├── util/         # Symbol table & source locations
 │   └── runtime/      # C runtime (print_integer, read_integer, div-by-zero handler)
 ├── bin/              # Main CLI entry point + Deserializer + Compiler pipeline
 ├── test/
@@ -68,52 +69,67 @@ The compiler executable is exposed under the public name `dolphin`
 ## Compiler Pipeline
 
 ```
+Dolphin source (.dlp)
+    |
+    v
+Lexer.token                  <- lexical analysis (ocamllex)
+    |
+    v
+Parser.program               <- parsing (Menhir)
+    |
+    v
 Ast.program
     |
     v
 Semant.typecheck_prog        <- semantic analysis / type checking
-    |
-    v
+   |
+   v
 TypedAst.program
-    |
-    v
+   |
+   v
 Codegen.codegen_prog         <- LLVM IR code generation
-    |
-    v
+  |
+  v
 Ll.prog  (printed as LLVM IR text)
 ```
 
 The integration entry point in `bin/compiler.ml`:
 
 ```ocaml
-val compile_prog_from_ast : Ast.program -> Ll.prog option
+val compile_prog_from_ast : Ast.program -> Ll.prog option 
+val compile_prog_from_filename : string -> Ll.prog option
 ```
 
-Returns `Some ll_prog` on success. On a semantic error it prints the error message(s)
-to stderr and returns `None`, so the compiler exits with exit code 1.
+`compile_prog_from_ast` runs semantic analysis and codegen on an already built AST (used by `--rescue` mode). 
+
+`compile_prog_from_filename` runs the whole pipeline on a `.dlp` file: lexer, parser, semantic analysis and codegen.  
+
+Both return `Some ll_prog` on success. On a lexical, syntax or semantic error they print the error message(s) to stderr and return `None`, so the compiler exits with exit code 1.
 
 ---
 
 ## Running the Compiler
 
-### Normal mode — from a serialized AST (used for grading)
+### Normal mode: directly from a `.dlp` source file
+
+Uses our own lexer and parser (lexer, parser, semantic analysis, codegen).
 
 ```bash
-dune exec dolphin -- compile --from-ast --phase 2 <ast.json>
+dune exec dolphin -- compile --phase 3 <file.dlp>
+```
+
+### Rescue mode: from a serialized AST
+
+Skips the frontend and starts from a JSON AST (useful for testing the later phases).
+
+```bash
+dune exec dolphin -- compile --rescue --phase 3 <ast.json>
 ```
 
 A serialized AST can be produced from a Dolphin source file with the reference serializer:
 
 ```bash
-dolphin-serialize serialize --phase 2 --output prog.json prog.dlp
-```
-
-### Rescue mode — directly from a `.dlp` source file
-
-Uses the reference parser in the container. Convenient for testing.
-
-```bash
-dune exec dolphin -- rescue --phase 2 <file.dlp>
+dolphin-serialize serialize --phase 3 --output prog.json prog.dlp
 ```
 
 ### Compiling and running the generated program
@@ -121,7 +137,7 @@ dune exec dolphin -- rescue --phase 2 <file.dlp>
 The compiler prints LLVM IR on stdout. Link it with the C runtime using clang:
 
 ```bash
-dune exec dolphin -- rescue --phase 2 prog.dlp > prog.ll
+dune exec dolphin -- compile --phase 3 prog.dlp > prog.ll
 clang prog.ll src/runtime/runtime.c -o prog
 ./prog; echo "exit code: $?"
 ```
@@ -131,7 +147,7 @@ clang prog.ll src/runtime/runtime.c -o prog
 | Exit code | Meaning |
 |-----------|---------|
 | `0`   | Program compiled successfully (LLVM IR printed on stdout) |
-| `1`   | Program rejected by semantic analysis (error printed on stderr) |
+| `1`   | Program rejected by the lexer, parser or semantic analysis (error printed on stderr) |
 | other | Internal error / crash (e.g. `125` for an uncaught exception) |
 
 ---
@@ -271,6 +287,21 @@ Phase 2:
 | `26_multidecl_type_error.dlp` | Type mismatch inside a declaration block |
 | `27_multidecl_void.dlp` | Void call as initializer inside a declaration block |
 | `28_for_update_type_error.dlp` | Ill-typed `for` update expression |
+
+Phase 3 (lexer and parser errors):
+
+| File | Error tested |
+|------|--------------|
+| `29_illegal_symbol.dlp` | Unexpected symbol (parser error) |
+| `30_missing_ending_quation_mark.dlp` | Missing closing quotation mark (lexer error) |
+| `31_missing_semicolon.dlp` | Missing `;` after a statement (parser error) |
+| `32_missing_ending_parenthesis.dlp` | Missing closing `)` (parser error) |
+| `33_missing_left_operand.dlp` | Binary operator without left operand (parser error) |
+| `34_using_keyword_as_variable_name.dlp` | Keyword used as a variable name (parser error) |
+| `35_missing_variable_name.dlp` | Declaration without a variable name (parser error) |
+| `36_missing_if_before_else.dlp` | `else` without a preceding `if` (parser error) |
+| `37_missing_parenthesis_while_loop.dlp` | Missing parenthesis in a `while` condition (parser error) |
+| `38_comment_with_end.dlp` | Block comment never closed (lexer error) |
 
 ---
 

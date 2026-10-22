@@ -8,7 +8,7 @@ COMPILER="./_build/default/bin/main.exe"
 POSITIVE_DIR="test/tests/positive"
 NEGATIVE_DIR="test/tests/negative"
 
-PHASE=2
+PHASE=3
 
 pass=0
 fail=0
@@ -23,7 +23,7 @@ run_positive() {
     exp_code=$(sed -n 's|^// Expected exit code: *||p' "$f" | head -n 1)
     exp_code=${exp_code:-0}
 
-    if ! "$COMPILER" rescue --phase "$PHASE" "$f" > "$TMP/out.ll" 2> /dev/null; then
+    if ! "$COMPILER" compile --phase "$PHASE" "$f" > "$TMP/out.ll" 2> /dev/null; then
         printf "  %-50s \033[31mFAILED (compile)\033[0m\n" "$f"; fail=$((fail + 1)); return
     fi
     if ! clang "$TMP/out.ll" "$RUNTIME" -o "$TMP/prog" -Wno-override-module 2> /dev/null; then
@@ -49,7 +49,7 @@ run_positive() {
 
 run_negative() {
     local f="$1"
-    "$COMPILER" rescue --phase "$PHASE" "$f" > /dev/null 2>&1
+    "$COMPILER" compile --phase "$PHASE" "$f" > /dev/null 2>&1
     local code=$?
     if [ "$code" -eq 1 ]; then
         printf "  %-50s \033[32mOK (rejected)\033[0m\n" "$f"

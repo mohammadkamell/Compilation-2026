@@ -1,0 +1,6 @@
+// Declaration inside a loop body is re-initialized on every iteration.
+// Expected output: 0 1 4
+// Expected exit code: 0
+
+for (var i = 0; i < 3; i = i + 1) { var sq = i * i; print_integer(sq); }
+return 0;
