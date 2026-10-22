@@ -10,6 +10,21 @@ let compile_prog_from_ast (prog : Ast.program) : Ll.prog option =
       let ll_prog = Codegen.codegen_prog typed_prog in
       Some ll_prog
 
-let compile_prog_from_filename (_filename : string) : Ll.prog option =
-  Printf.eprintf "compile_prog_from_filename: not implemented for Phase 1\n";
-  None
+let compile_prog_from_filename (filename : string) : Ll.prog option =
+  try
+    let ch = open_in filename in
+    let lexbuf = Lexing.from_channel ch in
+    Lexing.set_filename lexbuf filename;
+    let prog =
+      Fun.protect
+        ~finally:(fun () -> close_in ch)
+        (fun () -> Parser.program Lexer.token lexbuf)
+    in
+    compile_prog_from_ast prog
+  with
+  | Lexer.Error (loc, msg) ->
+    Printf.eprintf "%s: %s\n" (PrintBox_text.to_string (Location.location_to_tree loc)) msg;
+    None
+  | Parser.Error ->
+    Printf.eprintf "Syntax error in %s\n" filename;
+    None

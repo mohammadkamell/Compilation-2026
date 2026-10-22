@@ -7,3 +7,8 @@
  (name test_lexer)
  (modules test_lexer)
  (libraries util frontend printbox printbox-text))
+
+(test
+ (name test_parser)
+ (modules test_parser)
+ (libraries util frontend printbox printbox-text))
