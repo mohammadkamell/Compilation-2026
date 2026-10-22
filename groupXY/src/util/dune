@@ -1,4 +1,0 @@
-(library
- (name util)
- (wrapped false)
- (modules symbol))

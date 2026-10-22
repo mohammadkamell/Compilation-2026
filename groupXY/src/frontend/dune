@@ -1,5 +1,0 @@
-(library
- (name frontend)
- (wrapped false)
- (modules ast semant env errors pretty typedPretty)
- (libraries util ir printbox printbox-text))

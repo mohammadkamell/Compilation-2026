@@ -1,5 +1,0 @@
-(library
- (name backend)
- (wrapped false)
- (modules cfgBuilder codegen)
- (libraries util ir frontend))
