@@ -1,5 +1,8 @@
 (library
  (name frontend)
  (wrapped false)
- (modules ast semant env errors pretty typedPretty)
+ (modules ast semant env errors pretty typedPretty parser)
  (libraries util ir printbox printbox-text))
+
+(menhir
+ (modules parser))
