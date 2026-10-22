@@ -7,3 +7,6 @@ test:
 
 clean-test:
 	rm -f out.ll out
+
+semanttest:
+	dune exec ./test/semantic/test_semant.exe
