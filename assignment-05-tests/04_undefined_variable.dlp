@@ -1,0 +1,6 @@
+// NEGATIVE TEST: Use of an undeclared variable.
+// Semantic error: y is not declared before use.
+// Expected: semantic error, compiler returns None.
+
+var x = y + 1;
+return 0;

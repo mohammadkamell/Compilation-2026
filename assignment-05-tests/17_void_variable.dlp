@@ -1,0 +1,7 @@
+// NEGATIVE TEST: Variable initialised with a Void-returning function call.
+// print_integer returns Void; assigning its result to a variable is invalid.
+// Semantic error: variable type cannot be Void.
+// Expected: semantic error, compiler returns None.
+
+var x = print_integer(42);
+return 0;

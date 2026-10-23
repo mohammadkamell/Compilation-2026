@@ -1,0 +1,10 @@
+// continue in an inner for loop nested in a while loop.
+// Expected output: 10 12 20 22
+// Expected exit code: 0
+
+var i = 0;
+while (i < 2) {
+  i = i + 1;
+  for (var j = 0; j < 3; j = j + 1) { if (j == 1) continue; print_integer(i * 10 + j); }
+}
+return 0;

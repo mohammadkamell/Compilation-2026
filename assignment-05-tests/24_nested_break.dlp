@@ -1,0 +1,11 @@
+// break in an inner loop only exits the innermost loop.
+// Expected output: 0 1 10 11 20 21
+// Expected exit code: 0
+
+for (var i = 0; i < 3; i = i + 1) {
+  for (var j = 0; j < 10; j = j + 1) {
+    if (j == 2) break;
+    print_integer(i * 10 + j);
+  }
+}
+return 0;

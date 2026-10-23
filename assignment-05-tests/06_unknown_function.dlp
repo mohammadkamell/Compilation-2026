@@ -1,0 +1,6 @@
+// NEGATIVE TEST: Call to a function that does not exist.
+// Semantic error: unknown_function is not declared.
+// Expected: semantic error, compiler returns None.
+
+unknown_function(1, 2);
+return 0;

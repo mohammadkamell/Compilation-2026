@@ -1,0 +1,6 @@
+// For loop with init, condition and update.
+// Expected output: 0 1 2
+// Expected exit code: 0
+
+for (var i = 0; i < 3; i = i + 1) { print_integer(i); }
+return 0;

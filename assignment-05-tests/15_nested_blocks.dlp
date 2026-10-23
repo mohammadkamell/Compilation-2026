@@ -1,0 +1,14 @@
+// Tests nested blocks and that variables in inner blocks
+// are not visible after the block ends.
+// Expected output: 100 5
+// Expected exit code: 0
+
+var outer = 5;
+{
+    var inner = 100;
+    print_integer(inner);
+}
+// inner is not visible here — only outer is
+print_integer(outer);
+
+return 0;

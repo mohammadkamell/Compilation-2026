@@ -1,0 +1,2 @@
+if (true) { break; }
+return 0;

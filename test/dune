@@ -11,4 +11,5 @@
 (test
  (name test_parser)
  (modules test_parser)
+ (deps (source_tree tests))
  (libraries util frontend printbox printbox-text))

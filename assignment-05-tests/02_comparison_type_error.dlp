@@ -1,0 +1,6 @@
+// NEGATIVE TEST: Relational comparison applied to boolean operands.
+// Semantic error: < requires integer operands, booleans are not valid.
+// Expected: semantic error, compiler returns None.
+
+var x = true < false;
+return 0;

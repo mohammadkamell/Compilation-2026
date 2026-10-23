@@ -17,10 +17,11 @@ let compile_prog_from_filename (_filename : string) : Ll.prog option =
     None
   | input_channel ->
     let lexbuff = Lexing.from_channel input_channel in
+    Lexing.set_filename lexbuff _filename;
     let result =
     match Parser.program Lexer.token lexbuff with
-      | exception Lexer.Error (_, err_message) -> 
-        Printf.eprintf "Lexer error -> %s\n" err_message;
+      | exception Lexer.Error (loc, err_message) -> 
+        Printf.eprintf "%s: error: %s\n" (Errors.loc_to_string loc) err_message;
         None
       | exception Parser.Error -> 
         let position = lexbuff.Lexing.lex_curr_p in

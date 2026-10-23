@@ -1,0 +1,19 @@
+// Tests if/then/else with both branches.
+// Expected output: 10 20
+// Expected exit code: 0
+
+var cond1 = true;
+if (cond1) {
+    print_integer(10);
+} else {
+    print_integer(99);
+}
+
+var cond2 = false;
+if (cond2) {
+    print_integer(99);
+} else {
+    print_integer(20);
+}
+
+return 0;
