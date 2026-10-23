@@ -2,7 +2,7 @@
 
 A compiler for the Dolphin language that produces LLVM IR, built with OCaml and Dune.
 
-Phase 3 extends the language from Phase 1 and Phase 2 with:
+Phase 3 adds the frontend:
 
 - Task 1: lexer with `ocamllex`
 - Task 2: conflict-free parser with Menhir 
@@ -38,8 +38,8 @@ All tools are pre-installed in the provided Docker Dev Container:
 │   ├── semantic/
 │   │   └── test_semant.ml    # Unit tests for semantic analysis (Ast -> TypedAst)
 │   └── tests/
-│       ├── positive/         # Valid Dolphin programs with expected output
-│       └── negative/         # Invalid programs (must be rejected by semant)
+│       ├── positive/               # Valid Dolphin programs with expected output
+│       ├── negative/               # Invalid programs (rejected by semant), 01-28
 │       └── assignment-05-tests/    # Negative tests for lexer and parser errors 
 ├── run_tests.sh      # End-to-end test runner for the test corpus
 ├── dune
@@ -83,14 +83,14 @@ Ast.program
     |
     v
 Semant.typecheck_prog        <- semantic analysis / type checking
-   |
-   v
+    |
+    v
 TypedAst.program
-   |
-   v
+    |
+    v
 Codegen.codegen_prog         <- LLVM IR code generation
-  |
-  v
+    |
+    v
 Ll.prog  (printed as LLVM IR text)
 ```
 
@@ -161,7 +161,8 @@ clang prog.ll src/runtime/runtime.c -o prog
 bash run_tests.sh
 ```
 
-The script builds the project and then runs every program in `test/tests/`:
+The script builds the project and then runs every program in `test/tests/`
+with `compile --phase 3`:
 
 - **Positive tests** are compiled, linked with the C runtime, and executed with a
   5-second timeout (to detect infinite loops). Their output and exit code are compared
@@ -175,7 +176,8 @@ The script builds the project and then runs every program in `test/tests/`:
   Possible results: `OK`, `WRONG` (output or exit code differs), `TIMEOUT`,
   `FAILED (compile)` or `FAILED (clang)`.
 
-- **Negative tests** must be rejected by semantic analysis with **exit code 1**.
+- **Negative tests** (`negative/` and `assignment-05-tests/`) must be rejected by the
+  lexer, parser or semantic analysis with **exit code 1**.
   Exit code `0` is reported as `UNEXPECTED OK`, and any other exit code as `CRASH`,
   so that a crash is never mistaken for a correct rejection.
 
@@ -306,18 +308,18 @@ Phase 3 (lexer and parser errors):
 
 ---
 
-### Expected output in test files (Phase 2 update of `run_tests.sh`)
+### Expected output in test files (Phase 3 update of `run_tests.sh`)
  
 In Phase 1, `run_tests.sh` only checked whether the compiler succeeded or failed: positive tests were never executed, and a crash was counted as a correct rejection of a negative test.
 For Phase 2 the script was updated so that positive tests are checked against an expected result written directly in each `.dlp` file:
- 
+
 ```
 // Expected output: 0 1 2
 // Expected exit code: 0
 ```
  
 For every positive test, `run_tests.sh` now:
- 
+
 1. Extracts the expected output from the `// Expected output...:` line (any text between
    `output` and the colon is allowed, e.g. `// Expected output (printed by print_integer):`),
    and the expected exit code from the `// Expected exit code:` line (defaults to `0`).
@@ -325,8 +327,14 @@ For every positive test, `run_tests.sh` now:
 3. Runs the program with a 5-second timeout, with stdin redirected from `/dev/null`.
 4. Joins the printed lines into one space-separated line (each `print_integer` prints one
    line) and compares it, together with the exit code, to the expected values.
+
 If the output or exit code differs, the test is reported as `WRONG` together with the
 expected and actual values, which makes it easy to see what went wrong. Negative tests are now only counted as passed when the compiler exits with exactly exit code `1`.
+
+ 
+In Phase 3 the script calls `compile --phase 3` on the `.dlp` files and also runs
+`test/tests/assignment-05-tests/` in a separate section.
+
 
 ## Submission
 
@@ -342,7 +350,7 @@ zip -r groupXY.zip \
 Run the pre-submission checker:
 
 ```bash
-bash presub.sh 2 groupXY.zip
+bash presub.sh 3 groupXY.zip
 ```
 
 All 3 checks must pass before submitting.
