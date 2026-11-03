@@ -3,7 +3,10 @@
 
    Phase 3: source ASTs carry locations (dummy locations here), and semantic
    analysis collects all errors and raises Semant.TypeError with one message
-   per error, in source order. *)
+   per error, in source order.
+
+   Phase 4: the statements of each test are wrapped in int main() { ... }
+   by the helper [typecheck] below. *)
 module A = Ast
 module T = TypedAst
 
@@ -32,7 +35,7 @@ let decls ds = A.VarDeclStm (dblock ds)
 let expr value = A.ExprStm {expr = Some value; loc}
 let empty_stm = A.ExprStm {expr = None; loc}
 let block stms = A.CompoundStm {stms; loc}
-let ret value = A.ReturnStm {ret = value; loc}
+let ret value = A.ReturnStm {ret = Some value; loc}
 let if_ ?els cond thbr = A.IfThenElseStm {cond; thbr; elbro = els; loc}
 let while_ cond body = A.WhileStm {cond; body; loc}
 let for_ ?init ?cond ?update body = A.ForStm {init; cond; update; body; loc}
@@ -49,6 +52,14 @@ let op_lt = A.Lt {loc}       let op_le = A.Le {loc}        let op_gt = A.Gt {loc
 let op_ge = A.Ge {loc}       let op_eq = A.Eq {loc}        let op_neq = A.NEq {loc}
 let op_land = A.Land {loc}   let op_lor = A.Lor {loc}
 let op_neg = A.Neg {loc}     let op_lnot = A.Lnot {loc}
+
+(* Phase 4: a program is a list of functions. These tests check a function
+   body, so they wrap the statements in int main() { ... }. This matches the
+   temporary semantic analysis, which only checks the body of main. *)
+let typecheck stms =
+  Semant.typecheck_prog
+    [A.FunDecl {A.ret = A.RetTyp ty_int; A.funname = id "main";
+                A.params = []; A.body = stms; A.loc = loc}]
 
 (* ------------------------------------------------------------------------
    Expected typed-AST builders. These do not call semantic analysis.
@@ -74,7 +85,7 @@ let tprogram stms = stms @ [tret (tint 0)]
    ------------------------------------------------------------------------ *)
 let expect_typed source expected =
   equal "program structure, order, identifiers, and type annotations"
-    expected (Semant.typecheck_prog source)
+    expected (typecheck source)
 
 let contains text sub =
   let n = String.length text and m = String.length sub in
@@ -86,7 +97,7 @@ let contains text sub =
    an error does not cause follow-up errors. Only Semant.TypeError counts as
    a rejection: any other exception is a crash and makes the test fail. *)
 let expect_errors fragments source =
-  match Semant.typecheck_prog source with
+  match typecheck source with
   | _ -> fail "expected a TypeError, but the program was accepted"
   | exception Semant.TypeError messages ->
     let shown = String.concat " | " messages in
@@ -120,8 +131,8 @@ let declarations_tests = [
     expect_typed (program [decls []]) (tprogram [tdecls []]));
   "declaration block agrees with separate declarations", (fun () ->
     let ds = [decl "x" (int 2); decl "z" (bin (var "x") op_plus (int 5))] in
-    let grouped = Semant.typecheck_prog [decls ds; ret (var "z")] in
-    let separate = Semant.typecheck_prog [decls [List.hd ds];
+    let grouped = typecheck [decls ds; ret (var "z")] in
+    let separate = typecheck [decls [List.hd ds];
                                          decls [List.nth ds 1]; ret (var "z")] in
     match grouped, separate with
     | [T.VarDeclStm (T.DeclBlock actual); grouped_return],
@@ -151,7 +162,7 @@ let declarations_tests = [
   "compound declaration cannot escape", (fun () ->
     expect_error "unbound identifier 'x'" [block [decls [decl "x" (int 1)]]; ret (var "x")]);
   "checking separate programs does not share bindings", (fun () ->
-    ignore (Semant.typecheck_prog (program [decls [decl "x" (int 1)]]));
+    ignore (typecheck (program [decls [decl "x" (int 1)]]));
     expect_error "unbound identifier 'x'" [ret (var "x")])
 ]
 
@@ -325,7 +336,7 @@ let loop_tests = [
         T.ForStm {init = None; cond = None; update = None; body = T.BreakStm};
         T.ContinueStm; T.BreakStm]}]));
   "loop state does not cross programs", (fun () ->
-    ignore (Semant.typecheck_prog (program [for_ break_]));
+    ignore (typecheck (program [for_ break_]));
     expect_error "break statement outside of a loop" (program [break_]))
 ]
 

@@ -38,9 +38,9 @@
 
 %start <Ast.program> program
 
-// Defining precedens
-%nonassoc LOWER_THAN_ELSE 
-%nonassoc ELSE // To handler dangling else
+// Precedence, from lowest to highest
+%nonassoc LOWER_THAN_ELSE
+%nonassoc ELSE            // dangling else: else binds to the innermost if
 %right ASSIGN
 %left LOR
 %left LAND
@@ -50,11 +50,30 @@
 %left MUL DIV REM
 %nonassoc UNARY
 
-
 %%
 
+// ---------------------------------------------------------------------------
+// Programs and functions (phase 4)
+// ---------------------------------------------------------------------------
+
 program:
-  | stms = list(statement) EOF { stms }
+  | fs = nonempty_list(fundecl) EOF { fs }
+
+fundecl:
+  | ret = rettyp name = ident LPAREN params = separated_list(COMMA, param) RPAREN
+      LBRACE body = list(statement) RBRACE
+      { FunDecl {ret; funname = name; params; body; loc = Loc.make_location $loc} }
+
+rettyp:
+  | VOID    { Void {loc = Loc.make_location $loc} }
+  | t = typ { RetTyp t }
+
+param:
+  | id = ident COLON t = typ { (id, t) }
+
+// ---------------------------------------------------------------------------
+// Statements
+// ---------------------------------------------------------------------------
 
 statement:
   | db = decl_block SEMICOLON
@@ -76,7 +95,7 @@ statement:
       { ContinueStm {loc = Loc.make_location $loc} }
   | LBRACE stms = list(statement) RBRACE
       { CompoundStm {stms; loc = Loc.make_location $loc} }
-  | RETURN e = expr SEMICOLON
+  | RETURN e = option(expr) SEMICOLON          // phase 4: return; is allowed
       { ReturnStm {ret = e; loc = Loc.make_location $loc} }
 
 decl_block:
@@ -94,6 +113,10 @@ typ:
 for_init:
   | e = expr        { FIExpr e }
   | db = decl_block { FIDecl db }
+
+// ---------------------------------------------------------------------------
+// Expressions
+// ---------------------------------------------------------------------------
 
 expr:
   | i = INT_LIT                 { Integer {int = i; loc = Loc.make_location $loc} }

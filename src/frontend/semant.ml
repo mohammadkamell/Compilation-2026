@@ -256,8 +256,12 @@ let rec typecheck_statement env stm =
     let tstms, _ = typecheck_statement_seq env stms in
     (TAst.CompoundStm {stms = tstms}, env)
 
-  | Ast.ReturnStm {ret; _} ->
-    (TAst.ReturnStm {ret = typecheck_expr env ret TAst.Int "return value"}, env)
+  | Ast.ReturnStm {ret = Some e; _} ->
+    (TAst.ReturnStm {ret = typecheck_expr env e TAst.Int "return value"}, env)
+  | Ast.ReturnStm {ret = None; loc} ->
+    (* TEMPORARY: the phase 3 typed AST needs a return value, and main returns int *)
+    report (Errors.MissingReturn {loc = Some loc});
+    (TAst.ReturnStm {ret = TAst.Integer {int = 0L}}, env)
 
   | Ast.WhileStm {cond; body; _} ->
     let tcond = typecheck_expr env cond TAst.Bool "while condition" in
@@ -310,10 +314,20 @@ let initial_environment = Env.make_env [
 (* Checks the whole program and the requirement that it ends in a return.
    Raises [TypeError] with all error messages, in source order, if any
    error was found. *)
-let typecheck_prog prg =
+(* TEMPORARY bridge until the phase 4 semantic analysis (Task 2) is done:
+   only the body of main is checked, exactly as in phase 3. *)
+let typecheck_prog (prg : Ast.program) =
   errors := [];
-  let tstms, _ = typecheck_statement_seq initial_environment prg in
-  (match List.rev prg with
+  let main_body =
+    List.find_map
+      (fun (Ast.FunDecl f) ->
+         let (Ast.Ident {name; _}) = f.Ast.funname in
+         if name = "main" then Some f.Ast.body else None)
+      prg
+  in
+  let body = Option.value main_body ~default:[] in
+  let tstms, _ = typecheck_statement_seq initial_environment body in
+  (match List.rev body with
    | Ast.ReturnStm _ :: _ -> ()
    | [] -> report (Errors.MissingReturn {loc = None})
    | last :: _ -> report (Errors.MissingReturn {loc = Some (loc_of_statement last)}));
