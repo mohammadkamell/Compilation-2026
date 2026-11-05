@@ -17,7 +17,13 @@ type error =
   | InvalidExpressionStatement of {loc : Loc.location}
   | BreakOutsideLoop of {loc : Loc.location}
   | ContinueOutsideLoop of {loc : Loc.location}
-  | MissingReturn of {loc : Loc.location option}  (* None: the program is empty *)
+  | MissingReturn of {loc : Loc.location option}
+  | DuplicateFunction of {name : string; loc : Loc.location}
+  | DuplicateParameter of {name : string; loc : Loc.location}
+  | MainMissing
+  | MainBadSignature of {loc : Loc.location}
+  | ReturnValueInVoid of {loc : Loc.location}
+  | ReturnWithoutValue of {loc : Loc.location}
 
 (* "file:line:column", using the start position of the location. *)
 let loc_to_string (loc : Loc.location) : string =
@@ -52,16 +58,36 @@ let message = function
     "only assignments and function calls can be used as statements"
   | BreakOutsideLoop _ -> "break statement outside of a loop"
   | ContinueOutsideLoop _ -> "continue statement outside of a loop"
-  | MissingReturn {loc = None} -> "program is empty; it must end with a return statement"
-  | MissingReturn {loc = Some _} -> "program must end with a return statement"
+  | MissingReturn _ -> "function must return a value on all paths"   
+  | DuplicateFunction {name; _} ->   Printf.sprintf "function '%s' is declared more than once" name   
+  | DuplicateParameter {name; _} ->   Printf.sprintf "parameter '%s' is declared more than once" name   
+  | MainMissing -> "the program must contain a function 'main'"   
+  | MainBadSignature _ -> "main must have return type int and no arguments"   
+  | ReturnValueInVoid _ -> "a void function cant return a value"   
+  | ReturnWithoutValue _ -> "a non void function must return a value"
+  
 
 let location_of = function
-  | BinOpTypeError {loc; _} | UnOpTypeError {loc; _} | TypeMismatch {loc; _}
-  | UnboundIdentifier {loc; _} | NotAFunction {loc; _} | FunctionAsValue {loc; _}
-  | VoidAsValue {loc; _} | ArgumentCountMismatch {loc; _} | ArgumentTypeMismatch {loc; _}
-  | InvalidExpressionStatement {loc} | BreakOutsideLoop {loc} | ContinueOutsideLoop {loc} ->
-    Some loc
-  | MissingReturn {loc} -> loc
+  | BinOpTypeError { loc; _ }
+  | UnOpTypeError { loc; _ }
+  | TypeMismatch { loc; _ }
+  | UnboundIdentifier { loc; _ }
+  | NotAFunction { loc; _ }
+  | FunctionAsValue { loc; _ }
+  | VoidAsValue { loc; _ }
+  | ArgumentCountMismatch { loc; _ }
+  | ArgumentTypeMismatch { loc; _ }
+  | InvalidExpressionStatement { loc }
+  | BreakOutsideLoop { loc }
+  | ContinueOutsideLoop { loc }
+  | DuplicateFunction { loc; _ }
+  | DuplicateParameter { loc; _ }
+  | MainBadSignature { loc }
+  | ReturnValueInVoid { loc }
+  | ReturnWithoutValue { loc } ->
+      Some loc
+  | MissingReturn { loc } -> loc
+  | MainMissing -> None
 
 (* e.g. "prog.dlp:3:5: error: unbound identifier 'y'" *)
 let error_to_string err =

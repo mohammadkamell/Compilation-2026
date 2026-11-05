@@ -38,9 +38,15 @@
 
 %start <Ast.program> program
 
+<<<<<<< Updated upstream
 // Defining precedens
 %nonassoc LOWER_THAN_ELSE 
 %nonassoc ELSE // To handler dangling else
+=======
+// Precedence, from lowest to highest
+%nonassoc LOWER_THAN_ELSE
+%nonassoc ELSE            // dangling else: else binds to the innermost if
+>>>>>>> Stashed changes
 %right ASSIGN
 %left LOR
 %left LAND
@@ -50,15 +56,44 @@
 %left MUL DIV REM
 %nonassoc UNARY
 
+<<<<<<< Updated upstream
 
 %%
 
 program:
   | stms = list(statement) EOF { stms }
+=======
+%%
+
+// ---------------------------------------------------------------------------
+// Programs and functions
+// ---------------------------------------------------------------------------
+
+program:
+  | fs = nonempty_list(fundecl) EOF { fs }
+
+fundecl:
+  | ret = rettyp name = ident LPAREN params = separated_list(COMMA, param) RPAREN
+      LBRACE body = list(statement) RBRACE
+      { FunDecl {ret; funname = name; params; body; loc = Loc.make_location $loc} }
+
+rettyp:
+  | VOID    { Void {loc = Loc.make_location $loc} }
+  | t = typ { RetTyp t }
+
+param:
+  | id = ident COLON t = typ { (id, t) }
+
+// ---------------------------------------------------------------------------
+// Statements
+// Statement-level expressions may be comma expressions (comma_expr).
+// ---------------------------------------------------------------------------
+>>>>>>> Stashed changes
 
 statement:
   | db = decl_block SEMICOLON
       { VarDeclStm db }
+<<<<<<< Updated upstream
   | e = option(expr) SEMICOLON
       { ExprStm {expr = e; loc = Loc.make_location $loc} }
   | IF LPAREN c = expr RPAREN t = statement %prec LOWER_THAN_ELSE
@@ -69,6 +104,18 @@ statement:
       { WhileStm {cond = c; body = b; loc = Loc.make_location $loc} }
   | FOR LPAREN i = option(for_init) SEMICOLON c = option(expr) SEMICOLON
         u = option(expr) RPAREN b = statement
+=======
+  | e = option(comma_expr) SEMICOLON                         // phase 4: comma
+      { ExprStm {expr = e; loc = Loc.make_location $loc} }
+  | IF LPAREN c = comma_expr RPAREN t = statement %prec LOWER_THAN_ELSE   // phase 4: comma
+      { IfThenElseStm {cond = c; thbr = t; elbro = None; loc = Loc.make_location $loc} }
+  | IF LPAREN c = comma_expr RPAREN t = statement ELSE e = statement      // phase 4: comma
+      { IfThenElseStm {cond = c; thbr = t; elbro = Some e; loc = Loc.make_location $loc} }
+  | WHILE LPAREN c = comma_expr RPAREN b = statement         // phase 4: comma
+      { WhileStm {cond = c; body = b; loc = Loc.make_location $loc} }
+  | FOR LPAREN i = option(for_init) SEMICOLON c = option(comma_expr) SEMICOLON
+        u = option(comma_expr) RPAREN b = statement           // phase 4: comma
+>>>>>>> Stashed changes
       { ForStm {init = i; cond = c; update = u; body = b; loc = Loc.make_location $loc} }
   | BREAK SEMICOLON
       { BreakStm {loc = Loc.make_location $loc} }
@@ -76,9 +123,17 @@ statement:
       { ContinueStm {loc = Loc.make_location $loc} }
   | LBRACE stms = list(statement) RBRACE
       { CompoundStm {stms; loc = Loc.make_location $loc} }
+<<<<<<< Updated upstream
   | RETURN e = expr SEMICOLON
       { ReturnStm {ret = e; loc = Loc.make_location $loc} }
 
+=======
+  | RETURN e = option(comma_expr) SEMICOLON                  // phase 4: comma
+      { ReturnStm {ret = e; loc = Loc.make_location $loc} }
+
+// Declarations: the comma separates declarations, so initializers are
+// plain expressions (expr), never comma expressions.
+>>>>>>> Stashed changes
 decl_block:
   | VAR ds = separated_nonempty_list(COMMA, single_decl)
       { DeclBlock {declarations = ds; loc = Loc.make_location $loc} }
@@ -92,15 +147,38 @@ typ:
   | BOOL { Bool {loc = Loc.make_location $loc} }
 
 for_init:
+<<<<<<< Updated upstream
   | e = expr        { FIExpr e }
   | db = decl_block { FIDecl db }
 
+=======
+  | e = comma_expr  { FIExpr e }                              // phase 4: comma
+  | db = decl_block { FIDecl db }
+
+// ---------------------------------------------------------------------------
+// Expressions
+// comma_expr: full expression, may contain top-level commas.
+// expr:       expression without top-level commas; used where the comma is a
+//             separator (call arguments, declaration initializers) and for the
+//             operands of all other operators. Parentheses re-allow commas.
+// ---------------------------------------------------------------------------
+
+comma_expr:                                                   // phase 4: comma
+  | e = expr { e }
+  | l = comma_expr COMMA r = expr
+      { CommaExpr {left = l; right = r; loc = Loc.make_location $loc} }
+
+>>>>>>> Stashed changes
 expr:
   | i = INT_LIT                 { Integer {int = i; loc = Loc.make_location $loc} }
   | TRUE                        { Boolean {bool = true; loc = Loc.make_location $loc} }
   | FALSE                       { Boolean {bool = false; loc = Loc.make_location $loc} }
   | lv = lval                   { Lval lv }
+<<<<<<< Updated upstream
   | LPAREN e = expr RPAREN      { e }
+=======
+  | LPAREN e = comma_expr RPAREN { e }                        // phase 4: comma
+>>>>>>> Stashed changes
   | l = expr op = binop r = expr
       { BinOp {left = l; op; right = r; loc = Loc.make_location $loc} }
   | MINUS e = expr %prec UNARY

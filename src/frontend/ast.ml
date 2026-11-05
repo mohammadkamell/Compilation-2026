@@ -7,6 +7,13 @@ type typ =
 | Int of {loc : Loc.location}
 | Bool of {loc : Loc.location}
 
+<<<<<<< Updated upstream
+=======
+type rettyp =
+| Void of {loc : Loc.location}
+| RetTyp of typ
+
+>>>>>>> Stashed changes
 type binop =
 | Plus of {loc : Loc.location}
 | Minus of {loc : Loc.location}
@@ -34,6 +41,10 @@ type expr =
 | Lval of lval
 | Assignment of {lvl : lval; rhs : expr; loc : Loc.location}
 | Call of {fname : ident; args : expr list; loc : Loc.location}
+<<<<<<< Updated upstream
+=======
+| CommaExpr of {left : expr; right : expr; loc : Loc.location}
+>>>>>>> Stashed changes
 and lval =
 | Var of ident
 
@@ -54,6 +65,16 @@ type statement =
 | BreakStm of {loc : Loc.location}
 | ContinueStm of {loc : Loc.location}
 | CompoundStm of {stms : statement list; loc : Loc.location}
+<<<<<<< Updated upstream
 | ReturnStm of {ret : expr; loc : Loc.location}
 
 type program = statement list
+=======
+| ReturnStm of {ret : expr option; loc : Loc.location}
+
+type fundecl = {ret : rettyp; funname : ident; params : (ident * typ) list; body : statement list; loc : Loc.location}
+
+type program_fragment = FunDecl of fundecl
+
+type program = program_fragment list
+>>>>>>> Stashed changes

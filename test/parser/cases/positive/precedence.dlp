@@ -1,0 +1,6 @@
+int main() {
+  var x = 1 + 2 * 3 - 4 / 2 % 3, b = !true || false && 1 < 2 == true;
+  x = x = 5;
+  if (b) if (x > 0) return 1; else return 2;
+  return -x * 2;
+}

@@ -1,0 +1,9 @@
+int f(x: int, y: bool) { if (y) return x; else return -x; }
+void g() { return; }
+int main() {
+  var a = 0, b = 1;
+  for (a = 0, b = 10; a < 3; a = a + 1, b = b - 1) print_integer(f(a, true));
+  a = (1, 2);
+  f((a, b), false);
+  return a + b * 2 - -b;
+}

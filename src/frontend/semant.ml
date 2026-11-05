@@ -35,6 +35,7 @@ let loc_of_expr = function
   | Ast.Integer {loc; _} | Ast.Boolean {loc; _} | Ast.BinOp {loc; _}
   | Ast.UnOp {loc; _} | Ast.Assignment {loc; _} | Ast.Call {loc; _} -> loc
   | Ast.Lval (Ast.Var id) -> loc_of_ident id
+  | Ast.CommaExpr {loc; _} -> loc
 
 let loc_of_statement = function
   | Ast.VarDeclStm (Ast.DeclBlock {loc; _})
@@ -123,8 +124,13 @@ let rec infertype_expr env expr =
     (match ret with
      | TAst.RetTyp tp -> (tcall, tp)
      | TAst.Void ->
-       report (Errors.VoidAsValue {name = name_of fname; loc});
-       (tcall, TAst.ErrorType))
+        report (Errors.VoidAsValue {name = name_of fname; loc});
+        (tcall, TAst.ErrorType))
+    | Ast.CommaExpr {left; right; _} ->
+      let tleft, _ = infertype_expr_ret env left in 
+      let tright, rt = infertype_expr env right in
+      (TAst.CommaExpr {left = tleft; right = tright; tp = TAst.RetTyp rt}, rt)
+  
 
 and infertype_lval env (Ast.Var id) =
   let tp =
@@ -178,10 +184,16 @@ and typecheck_expr env expr expected context =
   texpr
 
 (* An expression whose value is discarded: void calls are allowed here. *)
-and typecheck_discarded_expr env expr =
-  match expr with
-  | Ast.Call {fname; args; loc} -> fst (typecheck_call env fname args loc)
-  | _ -> fst (infertype_expr env expr)
+and infertype_expr_ret env expr =   
+  match expr with   
+  | Ast.Call {fname; args; loc} -> typecheck_call env fname args loc   
+  | Ast.CommaExpr {left; right; _} ->     
+    let tleft, _ = infertype_expr_ret env left in     
+    let tright, rt = infertype_expr_ret env right in     
+    (TAst.CommaExpr {left = tleft; right = tright; tp = rt}, rt)   
+    | _ ->     let te, tp = infertype_expr env expr in     
+    (te, TAst.RetTyp tp)  
+and typecheck_discarded_expr env expr = fst (infertype_expr_ret env expr)
 
 (* ------------------------------------------------------------------------
    Declarations
@@ -228,8 +240,8 @@ let typecheck_for_init env = function
    ------------------------------------------------------------------------ *)
 
 (* Returns (typed statement, environment for the following statements). *)
-let rec typecheck_statement env stm =
-  match stm with
+let rec typecheck_statement env ret_tp stm =
+    match stm with
   | Ast.VarDeclStm decl_block ->
     let typed_block, new_env = typecheck_declaration_block env decl_block in
     (TAst.VarDeclStm typed_block, new_env)
@@ -248,20 +260,26 @@ let rec typecheck_statement env stm =
 
   | Ast.IfThenElseStm {cond; thbr; elbro; _} ->
     let tcond = typecheck_expr env cond TAst.Bool "if condition" in
-    let tthbr, _ = typecheck_statement env thbr in
-    let telbro = Option.map (fun s -> fst (typecheck_statement env s)) elbro in
+    let tthbr, _ = typecheck_statement env ret_tp thbr in
+    let telbro = Option.map (fun s -> fst (typecheck_statement env ret_tp s)) elbro in
     (TAst.IfThenElseStm {cond = tcond; thbr = tthbr; elbro = telbro}, env)
 
   | Ast.CompoundStm {stms; _} ->
-    let tstms, _ = typecheck_statement_seq env stms in
+    let tstms, _ = typecheck_statement_seq env ret_tp stms in
     (TAst.CompoundStm {stms = tstms}, env)
 
-  | Ast.ReturnStm {ret; _} ->
-    (TAst.ReturnStm {ret = typecheck_expr env ret TAst.Int "return value"}, env)
+  | Ast.ReturnStm {ret; loc} ->     
+    let tret =       
+      match ret, ret_tp with       
+      | Some e, TAst.RetTyp t -> Some (typecheck_expr env e t "return value")       
+      | Some e, TAst.Void -> report (Errors.ReturnValueInVoid {loc}); Some (fst (infertype_expr env e))       
+      | None, TAst.Void -> None       
+      | None, TAst.RetTyp _ -> report (Errors.ReturnWithoutValue {loc}); None in     
+      (TAst.ReturnStm {ret = tret}, env)
 
   | Ast.WhileStm {cond; body; _} ->
     let tcond = typecheck_expr env cond TAst.Bool "while condition" in
-    let tbody, _ = typecheck_statement (Env.enter_loop env) body in
+    let tbody, _ = typecheck_statement (Env.enter_loop env) ret_tp body in
     (TAst.WhileStm {cond = tcond; body = tbody}, env)
 
   | Ast.ForStm {init; cond; update; body; _} ->
@@ -274,7 +292,7 @@ let rec typecheck_statement env stm =
     let typed_cond =
       Option.map (fun c -> typecheck_expr for_env c TAst.Bool "for condition") cond in
     let typed_update = Option.map (typecheck_discarded_expr for_env) update in
-    let typed_body, _ = typecheck_statement (Env.enter_loop for_env) body in
+    let typed_body, _ = typecheck_statement (Env.enter_loop for_env) ret_tp body in
     (TAst.ForStm {init = typed_init; cond = typed_cond;
                   update = typed_update; body = typed_body}, env)
 
@@ -286,10 +304,10 @@ let rec typecheck_statement env stm =
     if not (Env.is_inside_loop env) then report (Errors.ContinueOutsideLoop {loc});
     (TAst.ContinueStm, env)
 
-and typecheck_statement_seq env stms =
+and typecheck_statement_seq env ret_tp stms =
   let result_env, tstms =
     List.fold_left_map
-      (fun env s -> let ts, env' = typecheck_statement env s in (env', ts))
+      (fun env s -> let ts, env' = typecheck_statement env ret_tp s in (env', ts))
       env stms
   in
   (tstms, result_env)
@@ -298,25 +316,105 @@ and typecheck_statement_seq env stms =
    Programs
    ------------------------------------------------------------------------ *)
 
-let initial_environment = Env.make_env [
-  ("print_integer",
-    TAst.FunTyp {ret = TAst.Void;
-                 params = [TAst.Param {paramname = TAst.Ident {sym = Symbol.symbol "value"};
-                                       typ = TAst.Int}]});
-  ("read_integer",
-    TAst.FunTyp {ret = TAst.RetTyp TAst.Int; params = []});
-]
+let rec returns = function    
+  | Ast.ReturnStm _ -> true    
+  | Ast.IfThenElseStm {thbr; elbro = Some el; _} -> returns thbr && returns el   
+  | Ast.CompoundStm {stms; _} -> List.exists returns stms   
+  | _ -> false
 
-(* Checks the whole program and the requirement that it ends in a return.
-   Raises [TypeError] with all error messages, in source order, if any
-   error was found. *)
+
+let typecheck_rettyp = function   
+| Ast.Void _ -> TAst.Void   
+| Ast.RetTyp t -> TAst.RetTyp (typecheck_typ t)
+
+
+let initial_environment = 
+  [   ("print_integer",     
+  TAst.FunTyp {ret = TAst.Void;
+  params = 
+  [
+    TAst.Param {paramname = TAst.Ident {sym = Symbol.symbol "value"};
+  typ = TAst.Int}]});   
+  ("read_integer",TAst.FunTyp {ret = TAst.RetTyp TAst.Int; params = []}); 
+  ]
+
+let funtype_of (f : Ast.fundecl) =   
+  TAst.FunTyp { ret = typecheck_rettyp f.Ast.ret; 
+  params = List.map (fun (id, t) -> TAst.Param {paramname = tident id; 
+  typ = typecheck_typ t}) f.Ast.params 
+  }
+
+let typecheck_fundecl env (f : Ast.fundecl) =
+  let ret_tp = typecheck_rettyp f.Ast.ret in
+  let seen = Hashtbl.create 8 in
+  let body_env, tparams =
+    List.fold_left_map
+      (fun env (id, t) ->
+        let tp = typecheck_typ t in
+        let name = name_of id in
+        let env' =
+          if Hashtbl.mem seen name then begin
+            report (Errors.DuplicateParameter { name; loc = loc_of_ident id });
+            env
+          end
+          else begin
+            Hashtbl.add seen name ();
+            Env.insert_local_decl env id tp
+          end
+        in
+        (env', TAst.Param { paramname = tident id; typ = tp }))
+      env f.Ast.params
+  in
+  let tbody, _ = typecheck_statement_seq body_env ret_tp f.Ast.body in
+  if ret_tp <> TAst.Void && not (List.exists returns f.Ast.body) then
+    report (Errors.MissingReturn { loc = Some f.Ast.loc });
+  TAst.FunDecl
+    {
+      funname = tident f.Ast.funname;
+      ret = ret_tp;
+      params = tparams;
+      body = tbody;
+    }
+
+
 let typecheck_prog prg =
   errors := [];
-  let tstms, _ = typecheck_statement_seq initial_environment prg in
-  (match List.rev prg with
-   | Ast.ReturnStm _ :: _ -> ()
-   | [] -> report (Errors.MissingReturn {loc = None})
-   | last :: _ -> report (Errors.MissingReturn {loc = Some (loc_of_statement last)}));
+  let funs = List.map (fun (Ast.FunDecl f) -> f) prg in
+  let seen = Hashtbl.create 16 in
+  List.iter (fun (n, _) -> Hashtbl.add seen n ()) initial_environment;
+  let user_sigs =
+    List.filter_map
+      (fun (f : Ast.fundecl) ->
+        let name = name_of f.Ast.funname in
+        if Hashtbl.mem seen name then begin
+          report
+            (Errors.DuplicateFunction { name; loc = loc_of_ident f.Ast.funname });
+            None
+        end
+        else begin
+          Hashtbl.add seen name ();
+          Some (name, funtype_of f)
+        end)
+      funs
+  in
+  let env = Env.make_env (initial_environment @ user_sigs) in
+  (match
+     List.filter (fun (f : Ast.fundecl) -> name_of f.Ast.funname = "main") funs
+   with
+  | [] -> report Errors.MainMissing
+  | mains ->
+      List.iter
+        (fun (f : Ast.fundecl) ->
+          match funtype_of f with
+          | TAst.FunTyp { ret = TAst.RetTyp TAst.Int; params = [] } -> ()
+          | _ ->
+              report
+                (Errors.MainBadSignature { loc = loc_of_ident f.Ast.funname }))
+          mains);
+  let tfuns = List.map (typecheck_fundecl env) funs in
   match !errors with
-  | [] -> tstms
+  | [] -> tfuns
   | errs -> raise (TypeError (List.rev_map Errors.error_to_string errs))
+
+
+

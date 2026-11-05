@@ -1,0 +1,1 @@
+int main() { var x : void = 1; return 0; }
