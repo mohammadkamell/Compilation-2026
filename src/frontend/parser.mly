@@ -53,7 +53,7 @@
 %%
 
 // ---------------------------------------------------------------------------
-// Programs and functions (phase 4)
+// Programs and functions
 // ---------------------------------------------------------------------------
 
 program:
@@ -73,21 +73,22 @@ param:
 
 // ---------------------------------------------------------------------------
 // Statements
+// Statement-level expressions may be comma expressions (comma_expr).
 // ---------------------------------------------------------------------------
 
 statement:
   | db = decl_block SEMICOLON
       { VarDeclStm db }
-  | e = option(expr) SEMICOLON
+  | e = option(comma_expr) SEMICOLON                         // phase 4: comma
       { ExprStm {expr = e; loc = Loc.make_location $loc} }
-  | IF LPAREN c = expr RPAREN t = statement %prec LOWER_THAN_ELSE
+  | IF LPAREN c = comma_expr RPAREN t = statement %prec LOWER_THAN_ELSE   // phase 4: comma
       { IfThenElseStm {cond = c; thbr = t; elbro = None; loc = Loc.make_location $loc} }
-  | IF LPAREN c = expr RPAREN t = statement ELSE e = statement
+  | IF LPAREN c = comma_expr RPAREN t = statement ELSE e = statement      // phase 4: comma
       { IfThenElseStm {cond = c; thbr = t; elbro = Some e; loc = Loc.make_location $loc} }
-  | WHILE LPAREN c = expr RPAREN b = statement
+  | WHILE LPAREN c = comma_expr RPAREN b = statement         // phase 4: comma
       { WhileStm {cond = c; body = b; loc = Loc.make_location $loc} }
-  | FOR LPAREN i = option(for_init) SEMICOLON c = option(expr) SEMICOLON
-        u = option(expr) RPAREN b = statement
+  | FOR LPAREN i = option(for_init) SEMICOLON c = option(comma_expr) SEMICOLON
+        u = option(comma_expr) RPAREN b = statement           // phase 4: comma
       { ForStm {init = i; cond = c; update = u; body = b; loc = Loc.make_location $loc} }
   | BREAK SEMICOLON
       { BreakStm {loc = Loc.make_location $loc} }
@@ -95,9 +96,11 @@ statement:
       { ContinueStm {loc = Loc.make_location $loc} }
   | LBRACE stms = list(statement) RBRACE
       { CompoundStm {stms; loc = Loc.make_location $loc} }
-  | RETURN e = option(expr) SEMICOLON          // phase 4: return; is allowed
+  | RETURN e = option(comma_expr) SEMICOLON                  // phase 4: comma
       { ReturnStm {ret = e; loc = Loc.make_location $loc} }
 
+// Declarations: the comma separates declarations, so initializers are
+// plain expressions (expr), never comma expressions.
 decl_block:
   | VAR ds = separated_nonempty_list(COMMA, single_decl)
       { DeclBlock {declarations = ds; loc = Loc.make_location $loc} }
@@ -111,19 +114,28 @@ typ:
   | BOOL { Bool {loc = Loc.make_location $loc} }
 
 for_init:
-  | e = expr        { FIExpr e }
+  | e = comma_expr  { FIExpr e }                              // phase 4: comma
   | db = decl_block { FIDecl db }
 
 // ---------------------------------------------------------------------------
 // Expressions
+// comma_expr: full expression, may contain top-level commas.
+// expr:       expression without top-level commas; used where the comma is a
+//             separator (call arguments, declaration initializers) and for the
+//             operands of all other operators. Parentheses re-allow commas.
 // ---------------------------------------------------------------------------
+
+comma_expr:                                                   // phase 4: comma
+  | e = expr { e }
+  | l = comma_expr COMMA r = expr
+      { CommaExpr {left = l; right = r; loc = Loc.make_location $loc} }
 
 expr:
   | i = INT_LIT                 { Integer {int = i; loc = Loc.make_location $loc} }
   | TRUE                        { Boolean {bool = true; loc = Loc.make_location $loc} }
   | FALSE                       { Boolean {bool = false; loc = Loc.make_location $loc} }
   | lv = lval                   { Lval lv }
-  | LPAREN e = expr RPAREN      { e }
+  | LPAREN e = comma_expr RPAREN { e }                        // phase 4: comma
   | l = expr op = binop r = expr
       { BinOp {left = l; op; right = r; loc = Loc.make_location $loc} }
   | MINUS e = expr %prec UNARY

@@ -1,0 +1,6 @@
+(copy_files# ../../bin/deserializer.{ml,mli})
+
+(executable
+ (name test_parser)
+ (modules test_parser deserializer)
+ (libraries frontend util yojson ppx_yojson_conv_lib printbox printbox-text))
