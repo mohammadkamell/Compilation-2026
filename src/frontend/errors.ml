@@ -58,7 +58,8 @@ let message = function
     "only assignments and function calls can be used as statements"
   | BreakOutsideLoop _ -> "break statement outside of a loop"
   | ContinueOutsideLoop _ -> "continue statement outside of a loop"
-  | MissingReturn _ -> "function must return a value on all paths"   
+  | MissingReturn {loc = None} -> "program is empty; it must end with a return statement"
+  | MissingReturn {loc = Some _} -> "program must end with a return statement"   
   | DuplicateFunction {name; _} ->   Printf.sprintf "function '%s' is declared more than one time" name   
   | DuplicateParam {name; _} ->   Printf.sprintf "The parameter '%s' is declared more than once" name   
   | MainMissing -> "the program should contain a function 'main'"   

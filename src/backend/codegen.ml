@@ -14,6 +14,13 @@ let fresh (prefix : string ) : Sym.symbol =
   incr counter;
   Sym.symbol (prefix ^"_"^ string_of_int !counter)
 
+(* Name resolution for functions in LLVM *)
+let llvm_fun_name (name : string) : string =
+  match name with
+  | "main" -> "dolphin_main"
+  | "print_integer" | "read_integer" | "dolphin_div_by_zero" -> name
+  | _ -> "dolphin_fun_" ^ name
+
 
 (* Type mapping (bottom up approach)*)
 let ll_type_of_typ (tp: T.typ) : L.ty = 
@@ -57,6 +64,7 @@ let rec type_of_expr (e : T.expr) : T.rettyp =
   | T.Lval lvl -> type_of_lval lvl
   | T.Assignment {tp; _} -> T.RetTyp tp
   | T.Call {tp; _} -> tp
+  | T.CommaExpr {tp; _} -> T.RetTyp tp
 and type_of_lval (l : T.lval) : T.rettyp =
   match l with
   | T.Var {tp; _} -> T.RetTyp tp
@@ -131,7 +139,8 @@ let rec trans_expr (env: env) (e: T.expr) (b: B.cfg_builder) : B.cfg_builder * L
       (b2, L.Id temp)
   | T.Call {fname = T.Ident {sym}; args; tp} -> 
       let (b1, ops) = trans_args env args b in 
-      let instruction = L.Call( ll_type_of_rettyp tp, L.Gid sym, ops) in 
+      let callee = Sym.symbol (llvm_fun_name (Sym.name sym)) in
+      let instruction = L.Call( ll_type_of_rettyp tp, L.Gid callee, ops) in 
       (match tp with
       | T.Void -> 
           let b2 = B.add_insn (None, instruction) b1 in 
@@ -141,6 +150,10 @@ let rec trans_expr (env: env) (e: T.expr) (b: B.cfg_builder) : B.cfg_builder * L
           let b2 = B.add_insn (Some temp, instruction) b1 in 
           (b2, L.Id temp)
         )
+  | T.CommaExpr {left; right; _} ->
+      let (b1, _) = trans_expr env left b in
+      let (b2, o2) = trans_expr env right b1 in
+      (b2, o2)
   |T.Lval (T.Var {ident = T.Ident {sym}; _}) -> 
       let (slot, llty) = Sym.Table.find sym env in 
       let temp = fresh "temp" in 
@@ -164,11 +177,16 @@ match args with
 
 let rec trans_stmt (env: env) (break_lbl: L.lbl) (cont_lbl: L.lbl) (s: T.statement) (b: B.cfg_builder) : env * B.cfg_builder = 
   match s with 
-  | T.ReturnStm {ret} ->
-    let (b1, op) = trans_expr env ret b in
-    let b2 = B.term_block (L.Ret (L.I64, Some op)) b1 in
+  | T.ReturnStm {ret = Some e} ->
+    let (b1, op) = trans_expr env e b in
+    let ty = ll_type_of_rettyp (type_of_expr e) in
+    let b2 = B.term_block (L.Ret (ty, Some op)) b1 in
     let b3 = B.start_block (fresh "after_return") b2 in
     (env, b3)
+  | T.ReturnStm {ret = None} ->
+    let b1 = B.term_block (L.Ret (L.Void, None)) b in
+    let b2 = B.start_block (fresh "after_return") b1 in
+    (env, b2)
   | T.ExprStm {expr} -> 
       (match expr with
       | Some e -> 
@@ -256,22 +274,52 @@ let rec trans_stmt (env: env) (break_lbl: L.lbl) (cont_lbl: L.lbl) (s: T.stateme
       let b2 = B.start_block (fresh "after_continue") b1 in     
       (env, b2)
 
-
-
+let trans_fundecl (T.FunDecl {ret; funname = T.Ident {sym}; params; body}) : Sym.symbol * L.fdecl =
+  let fn_name = llvm_fun_name (Sym.name sym) in
+  let fn_gid = Sym.symbol fn_name in
+  let param_tys = List.map (fun (T.Param {typ; _}) -> ll_type_of_typ typ) params in
+  let ret_llty = ll_type_of_rettyp ret in
+  let fty = (param_tys, ret_llty) in
+  (* Generate fresh uids for LLVM parameters *)
+  let param_uids = List.map (fun (T.Param {paramname = T.Ident {sym = psym}; _}) ->
+    fresh (Sym.name psym ^ "_arg")
+  ) params in
+  (* Allocate local stack space for copying each argument *)
+  let (env, b_params) =
+    List.fold_left (fun (env_acc, b_acc) (T.Param {paramname = T.Ident {sym = psym}; typ}, arg_uid) ->
+      let llty = ll_type_of_typ typ in
+      let local_slot = fresh (Sym.name psym ^ "_local_arg_copy") in
+      let b1 = B.add_alloca (local_slot, llty) b_acc in
+      let b2 = B.add_insn (None, L.Store (llty, L.Id arg_uid, L.Id local_slot)) b1 in
+      let env' = Sym.Table.add psym (local_slot, llty) env_acc in
+      (env', b2)
+    ) (empty_env, B.empty_cfg_builder) (List.combine params param_uids)
+  in
+  let no_break = fresh "no_break" in
+  let no_cont = fresh "no_cont" in
+  let (_, b_body) =
+    List.fold_left (fun (env_acc, b_acc) s -> trans_stmt env_acc no_break no_cont s b_acc)
+      (env, b_params) body
+  in
+  (* Terminate the block if needed *)
+  let final_b =
+    if B.is_labelled b_body then
+      match ret with
+      | T.Void -> B.term_block (L.Ret (L.Void, None)) b_body
+      | T.RetTyp _ -> B.term_block L.Unreachable b_body
+    else
+      b_body
+  in
+  let cfg = B.get_cfg final_b in
+  (fn_gid, { L.fty; param = param_uids; cfg })
 
 let codegen_prog (prog: T.program) : L.prog = 
-    let no_break = fresh "negative_break" in   
-    let no_cont  = fresh "negative_continue" in
-  let (_, final_b) = List.fold_left (fun (env, b) s -> trans_stmt env no_break no_cont s b)
-  (empty_env, B.empty_cfg_builder) prog in 
-  let cfg = B.get_cfg final_b in 
+  let fdecls = List.map (fun (T.FunDecl _ as fd) -> trans_fundecl fd) prog in 
   { L.tdecls = [];
     extgdecls = [];
     gdecls = []; 
     extfuns = [ (Sym.symbol "print_integer", ([L.I64], L.Void));
                 (Sym.symbol "read_integer", ([], L.I64));
                 (Sym.symbol "dolphin_div_by_zero", ([], L.Void)) ];
-    fdecls = [ (Sym.symbol "dolphin_main", 
-                  {fty = ([], L.I64); param = []; cfg})] 
+    fdecls;
   }
-

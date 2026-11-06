@@ -129,9 +129,9 @@ let rec infertype_expr env expr =
         report (Errors.VoidAsValue {name = name_of fname; loc});
         (tcall, TAst.ErrorType))
     | Ast.CommaExpr {left; right; _} ->
-      let tleft, _ = infertype_expr_ret env left in 
+      let tleft, _ = infertype_expr env left in 
       let tright, rt = infertype_expr env right in
-      (TAst.CommaExpr {left = tleft; right = tright; tp = TAst.RetTyp rt}, rt)
+      (TAst.CommaExpr {left = tleft; right = tright; tp = rt}, rt)
   
 
 and infertype_lval env (Ast.Var id) =
@@ -191,8 +191,9 @@ and infertype_expr_ret env expr =
   | Ast.Call {fname; args; loc} -> typecheck_call env fname args loc   
   | Ast.CommaExpr {left; right; _} ->     
     let tleft, _ = infertype_expr_ret env left in     
-    let tright, rt = infertype_expr_ret env right in     
-    (TAst.CommaExpr {left = tleft; right = tright; tp = rt}, rt)   
+    let tright, rt = infertype_expr_ret env right in
+    let tp = match rt with TAst.RetTyp t -> t | TAst.Void -> TAst.ErrorType in
+    (TAst.CommaExpr {left = tleft; right = tright; tp}, rt)   
     | _ ->     let te, tp = infertype_expr env expr in     
     (te, TAst.RetTyp tp)  
 and typecheck_discarded_expr env expr = fst (infertype_expr_ret env expr)
@@ -368,8 +369,10 @@ let typecheck_fundecl env (f : Ast.fundecl) =
       env f.Ast.params
   in
   let tbody, _ = typecheck_statement_seq body_env ret_tp f.Ast.body in
-  if ret_tp <> TAst.Void && not (List.exists returns f.Ast.body) then
-    report (Errors.MissingReturn { loc = Some f.Ast.loc });
+  if ret_tp <> TAst.Void && not (List.exists returns f.Ast.body) then begin
+    let loc = if f.Ast.body = [] then None else Some f.Ast.loc in
+    report (Errors.MissingReturn { loc })
+  end;
   TAst.FunDecl
     {
       funname = tident f.Ast.funname;
@@ -431,7 +434,10 @@ let typecheck_prog prg =
     funs;
   
   (* Report if main isn't found *)
-  if not !main_is_found then report Errors.MainMissing;
+  if not !main_is_found then begin
+    if funs = [] then report (Errors.MissingReturn {loc = None})
+    else report Errors.MainMissing
+  end;
 
   (* Type checking the funcs*)
   let typ_fun = List.map (typecheck_fundecl env) funs in

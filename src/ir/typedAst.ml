@@ -20,7 +20,7 @@ type expr =
 | Lval of lval
 | Assignment of {lvl : lval; rhs : expr; tp : typ}
 | Call of {fname : ident; args : expr list; tp : rettyp}
-| CommaExpr of {left : expr; right : expr; tp : rettyp}
+| CommaExpr of {left : expr; right : expr; tp : typ}
 and lval =
 | Var of {ident : ident; tp : typ}
 
@@ -50,9 +50,13 @@ type param = Param of {paramname : ident; typ : typ}
 
 type funtype = FunTyp of {ret : rettyp; params : param list}
 
-type fundecl = { funname : ident; ret : rettyp; params : param list; body : statement list }
+type fundecl = {
+  ret : rettyp;
+  funname : ident;
+  params : param list;
+  body : statement list;
+}
 
-
-type program_fragment = FunDecl of fundecl  
+type program_fragment = FunDecl of fundecl
 
 type program = program_fragment list

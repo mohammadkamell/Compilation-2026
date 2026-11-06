@@ -59,6 +59,8 @@ let rec expr_to_tree e =
       [rettyp_to_tree tp; 
       PBox.hlist ~bars:false [Pretty.make_info_node_line "FunName: "; ident_to_tree fname];
         PBox.tree (Pretty.make_info_node_line "Args") (List.map (fun e -> expr_to_tree e) args)]
+  | CommaExpr {left; right; tp; _} ->
+    PBox.tree (Pretty.make_info_node_line "CommaExpr") [typ_to_tree tp; expr_to_tree left; expr_to_tree right]
 and lval_to_tree l =
   match l with
   | Var {ident; tp} -> PBox.hlist ~bars:false [Pretty.make_info_node_line "Var("; ident_to_tree ident; Pretty.make_info_node_line ")"; PBox.line " : "; typ_to_tree tp;]
@@ -97,8 +99,18 @@ let rec statement_to_tree c =
   | BreakStm -> Pretty.make_keyword_line "BreakStm"
   | ContinueStm -> Pretty.make_keyword_line "ContinueStm"
   | CompoundStm {stms; _} -> PBox.tree (Pretty.make_info_node_line "CompoundStm") (statement_seq_to_forest stms)
-  | ReturnStm {ret; _} -> PBox.hlist ~bars:false [Pretty.make_keyword_line "ReturnValStm: "; expr_to_tree ret]
+  | ReturnStm {ret = Some e; _} -> PBox.hlist ~bars:false [Pretty.make_keyword_line "ReturnValStm: "; expr_to_tree e]
+  | ReturnStm {ret = None; _} -> Pretty.make_keyword_line "ReturnVoidStm"
 and statement_seq_to_forest stms = List.map statement_to_tree stms
 
+let fundecl_to_tree (FunDecl {ret; funname; params; body; _}) =
+  PBox.tree (Pretty.make_keyword_line "FunDecl")
+    ([PBox.hlist ~bars:false [Pretty.make_info_node_line "RetType: "; rettyp_to_tree ret];
+      PBox.hlist ~bars:false [Pretty.make_info_node_line "Name: "; ident_to_tree funname];
+      PBox.tree (Pretty.make_info_node_line "Params")
+        (List.map (fun (Param {paramname; typ}) ->
+          PBox.hlist ~bars:false [ident_to_tree paramname; PBox.line " : "; typ_to_tree typ]) params)]
+    @ statement_seq_to_forest body)
+
 let program_to_tree prg =
-  PBox.tree (Pretty.make_info_node_line "Program") (statement_seq_to_forest prg)
+  PBox.tree (Pretty.make_info_node_line "Program") (List.map fundecl_to_tree prg)
