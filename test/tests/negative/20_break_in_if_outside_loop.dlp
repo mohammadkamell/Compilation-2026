@@ -1,2 +1,4 @@
-if (true) { break; }
-return 0;
+int main() {
+    if (true) { break; }
+    return 0;
+}

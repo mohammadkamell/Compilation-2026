@@ -1,0 +1,17 @@
+// Expected output: 55
+// Expected exit code: 0
+
+int main() {
+    var r = helper(10);
+    print_integer(r);
+    return 0;
+}
+
+int helper(n: int) {
+    if (n <= 1) {
+        return n;
+    } else {
+        return n + helper(n - 1);
+    }
+}
+

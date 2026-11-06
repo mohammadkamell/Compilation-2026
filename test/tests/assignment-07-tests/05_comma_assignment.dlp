@@ -1,0 +1,14 @@
+// Expected output: 2 40
+// Expected exit code: 0
+
+int main() {
+    var x = 0;
+    x = (1, 2);
+    print_integer(x);
+
+    var y = 0;
+    var z = (x = 10, y = 20, x + y + 10);
+    print_integer(z);
+    return 0;
+}
+

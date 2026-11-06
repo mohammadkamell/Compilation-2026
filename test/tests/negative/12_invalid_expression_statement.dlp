@@ -3,5 +3,7 @@
 //                 valid as expression statements.
 // Expected: semantic error, compiler returns None.
 
-1 + 2;
-return 0;
+int main() {
+    1 + 2;
+    return 0;
+}

@@ -3,8 +3,10 @@
 // Expected output: 7 42
 // Expected exit code: 0
 
-print_integer(7);
-var n = 42;
-print_integer(n);
+int main() {
+    print_integer(7);
+    var n = 42;
+    print_integer(n);
 
-return 0;
+    return 0;
+}

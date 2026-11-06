@@ -2,5 +2,7 @@
 // Semantic error: annotation says int, but initializer is bool.
 // Expected: semantic error, compiler returns None.
 
-var x : int = true;
-return 0;
+int main() {
+    var x : int = true;
+    return 0;
+}

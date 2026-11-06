@@ -2,8 +2,10 @@
 // Semantic error: inner is declared inside the block and not visible outside.
 // Expected: semantic error, compiler returns None.
 
-{
-    var inner = 5;
+int main() {
+    {
+        var inner = 5;
+    }
+    print_integer(inner);
+    return 0;
 }
-print_integer(inner);
-return 0;

@@ -1,0 +1,17 @@
+// Expected output: 100
+// Expected exit code: 0
+
+int double_val(x: int) {
+    return x * 2;
+}
+
+int square(x: int) {
+    return x * x;
+}
+
+int main() {
+    var res = square(double_val(5));
+    print_integer(res);
+    return 0;
+}
+

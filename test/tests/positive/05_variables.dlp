@@ -3,11 +3,14 @@
 // Expected exit code: 0
 
 // Declaration without annotation — type inferred as int
-var x = 42;
-print_integer(x);
 
-// Declaration with explicit type annotation
-var y : int = 1;
-print_integer(y);
+int main() {
+    var x = 42;
+    print_integer(x);
 
-return 0;
+    // Declaration with explicit type annotation
+    var y : int = 1;
+    print_integer(y);
+
+    return 0;
+}

@@ -1,0 +1,25 @@
+// Expected output: 1 0
+// Expected exit code: 0
+
+int is_even(n: int) {
+    if (n == 0) {
+        return 1;
+    } else {
+        return is_odd(n - 1);
+    }
+}
+
+int is_odd(n: int) {
+    if (n == 0) {
+        return 0;
+    } else {
+        return is_even(n - 1);
+    }
+}
+
+int main() {
+    print_integer(is_even(6));
+    print_integer(is_even(7));
+    return 0;
+}
+

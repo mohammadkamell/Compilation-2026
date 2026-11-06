@@ -1,3 +1,5 @@
-while (false) { }
-break;
-return 0;
+int main() {
+    while (false) { }
+    break;
+    return 0;
+}

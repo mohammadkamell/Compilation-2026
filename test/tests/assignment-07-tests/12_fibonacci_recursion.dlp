@@ -1,0 +1,22 @@
+// Expected output: 0 1 1 2 3 5 8 13
+// Expected exit code: 0
+
+int fib(n: int) {
+    if (n <= 0) {
+        return 0;
+    } else {
+        if (n == 1) {
+            return 1;
+        } else {
+            return fib(n - 1) + fib(n - 2);
+        }
+    }
+}
+
+int main() {
+    for (var i = 0; i < 8; i = i + 1) {
+        print_integer(fib(i));
+    }
+    return 0;
+}
+

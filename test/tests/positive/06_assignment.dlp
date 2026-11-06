@@ -2,11 +2,13 @@
 // Expected output: 10 99
 // Expected exit code: 0
 
-var x = 10;
-print_integer(x);
+int main() {
+    var x = 10;
+    print_integer(x);
 
-// Assignment to an existing variable
-x = 99;
-print_integer(x);
+    // Assignment to an existing variable
+    x = 99;
+    print_integer(x);
 
-return 0;
+    return 0;
+}

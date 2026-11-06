@@ -1,0 +1,19 @@
+// Expected output: 111 222 333
+// Expected exit code: 0
+
+void print_both(a: int, b: int) {
+    print_integer(a);
+    print_integer(b);
+    return;
+}
+
+void print_one(a: int) {
+    print_integer(a);
+}
+
+int main() {
+    print_both(111, 222);
+    print_one(333);
+    return 0;
+}
+

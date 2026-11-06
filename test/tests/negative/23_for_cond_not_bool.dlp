@@ -1,2 +1,4 @@
-for (; 5 ;) { }
-return 0;
+int main() {
+    for (; 5 ;) { }
+    return 0;
+}

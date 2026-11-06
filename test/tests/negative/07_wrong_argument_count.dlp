@@ -2,5 +2,7 @@
 // Semantic error: print_integer takes 1 argument, but 2 are provided.
 // Expected: semantic error, compiler returns None.
 
-print_integer(1, 2);
-return 0;
+int main() {
+    print_integer(1, 2);
+    return 0;
+}

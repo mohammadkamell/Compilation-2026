@@ -1,4 +1,15 @@
+[@@@warning "-32"]
+
 module T = TypedAst
+
+let wrap_main (stms : T.statement list) : T.program = [
+  T.FunDecl {
+    ret = T.RetTyp T.Int;
+    funname = T.Ident {sym = Symbol.symbol "main"};
+    params = [];
+    body = stms;
+  }
+]
 
 let var_decl name tp body =
   T.VarDeclStm (T.DeclBlock [
@@ -9,9 +20,9 @@ let var_decl name tp body =
     }
   ])
 
-let test_neg_mul : T.program = [
+let test_neg_mul : T.program = wrap_main [
   T.ReturnStm {
-    ret = T.BinOp {
+    ret = Some (T.BinOp {
       left = T.UnOp {
         op = T.Neg;
         operand = T.Integer {int = 5L};
@@ -20,11 +31,11 @@ let test_neg_mul : T.program = [
       op = T.Mul;
       right = T.Integer {int = 5L};
       tp = T.Int
-    }
+    })
   }
 ]
 
-let test_call_print : T.program = [
+let test_call_print : T.program = wrap_main [
   T.ExprStm {expr = Some (T.Call {
     fname = T.Ident {sym = Symbol.symbol "print_integer"};
     args = [
@@ -41,10 +52,10 @@ let test_call_print : T.program = [
     ];
     tp = T.Void
   })};
-  T.ReturnStm {ret = T.Integer {int = 0L}}
+  T.ReturnStm {ret = Some (T.Integer {int = 0L})}
 ]
 
-let test_read_mul : T.program = [
+let test_read_mul : T.program = wrap_main [
   T.ExprStm {expr = Some (T.Call {
     fname = T.Ident {sym = Symbol.symbol "print_integer"};
     args = [
@@ -61,16 +72,16 @@ let test_read_mul : T.program = [
     ];
     tp = T.Void
   })};
-  T.ReturnStm {ret = T.Integer {int = 0L}}
+  T.ReturnStm {ret = Some (T.Integer {int = 0L})}
 ]
 
-let test_vardecl : T.program = [
+let test_vardecl : T.program = wrap_main [
   var_decl "x" T.Int (T.Integer {int = 10L});
-  T.ReturnStm {ret = T.Integer {int = 0L}}
+  T.ReturnStm {ret = Some (T.Integer {int = 0L})}
 ]
 
 (* var x = 10; print_integer(x * 2); return 0; → prints 20 *)
-let test_lval : T.program = [
+let test_lval : T.program = wrap_main [
   var_decl "x" T.Int (T.Integer {int = 10L});
   T.ExprStm {expr = Some (T.Call {
     fname = T.Ident {sym = Symbol.symbol "print_integer"};
@@ -87,14 +98,14 @@ let test_lval : T.program = [
     ];
     tp = T.Void
   })};
-  T.ReturnStm {ret = T.Integer {int = 0L}}
+  T.ReturnStm {ret = Some (T.Integer {int = 0L})}
 ]
 
 let x_sym = Symbol.symbol "x"
 let x_lval = T.Var {ident = T.Ident {sym = x_sym}; tp = T.Int}
 
 (* var x = 10; x = x * 3; print_integer(x); return 0; → prints 30 *)
-let test_assign : T.program = [
+let test_assign : T.program = wrap_main [
   var_decl "x" T.Int (T.Integer {int = 10L});
   T.ExprStm {expr = Some (T.Assignment {
     lvl = x_lval;
@@ -111,7 +122,7 @@ let test_assign : T.program = [
     args = [T.Lval x_lval];
     tp = T.Void
   })};
-  T.ReturnStm {ret = T.Integer {int = 0L}}
+  T.ReturnStm {ret = Some (T.Integer {int = 0L})}
 ]
 
 let print_x = T.ExprStm {expr = Some (T.Call {
@@ -120,18 +131,18 @@ let print_x = T.ExprStm {expr = Some (T.Call {
   tp = T.Void
 })}
 
-let test_shadow : T.program = [
+let test_shadow : T.program = wrap_main [
   var_decl "x" T.Int (T.Integer {int = 10L});
   T.CompoundStm {stms = [
     var_decl "x" T.Int (T.Integer {int = 12L});
     print_x
   ]};
   print_x;
-  T.ReturnStm {ret = T.Integer {int = 0L}}
+  T.ReturnStm {ret = Some (T.Integer {int = 0L})}
 ]
 
 (* var b = 3 < 5; var c = -1 < 5; var d = b == c; return 0; *)
-let test_cmp : T.program = [
+let test_cmp : T.program = wrap_main [
   var_decl "b" T.Bool
     (T.BinOp {
       left = T.Integer {int = 3L};
@@ -163,7 +174,7 @@ let test_cmp : T.program = [
       });
       tp = T.Bool
     });
-  T.ReturnStm {ret = T.Integer {int = 0L}}
+  T.ReturnStm {ret = Some (T.Integer {int = 0L})}
 ]
 
 let print_int n = T.ExprStm {expr = Some (T.Call {
@@ -173,7 +184,7 @@ let print_int n = T.ExprStm {expr = Some (T.Call {
 })}
 
 (* if (read_integer() < 10) print_integer(1); return 0; *)
-let test_if : T.program = [
+let test_if : T.program = wrap_main [
   T.IfThenElseStm {
     cond = T.BinOp {
       left = T.Call {
@@ -188,11 +199,11 @@ let test_if : T.program = [
     thbr = print_int 1;
     elbro = None
   };
-  T.ReturnStm {ret = T.Integer {int = 0L}}
+  T.ReturnStm {ret = Some (T.Integer {int = 0L})}
 ]
 
 (* Input 3 → exit code 1; input 42 → exit code 2. *)
-let test_if_return : T.program = [
+let test_if_return : T.program = wrap_main [
   T.IfThenElseStm {
     cond = T.BinOp {
       left = T.Call {
@@ -204,10 +215,10 @@ let test_if_return : T.program = [
       right = T.Integer {int = 10L};
       tp = T.Bool
     };
-    thbr = T.ReturnStm {ret = T.Integer {int = 1L}};
-    elbro = Some (T.ReturnStm {ret = T.Integer {int = 2L}})
+    thbr = T.ReturnStm {ret = Some (T.Integer {int = 1L})};
+    elbro = Some (T.ReturnStm {ret = Some (T.Integer {int = 2L})})
   };
-  T.ReturnStm {ret = T.Integer {int = 0L}}
+  T.ReturnStm {ret = Some (T.Integer {int = 0L})}
 ]
 
 let read_int = T.Call {
@@ -224,7 +235,7 @@ let print_e e = T.ExprStm {expr = Some (T.Call {
 
 (* print_integer(100 / input); print_integer(-7 % 3);
    Input 4 → prints 25 and -1. *)
-let test_div : T.program = [
+let test_div : T.program = wrap_main [
   print_e (T.BinOp {
     left = T.Integer {int = 100L};
     op = T.Div;
@@ -241,14 +252,14 @@ let test_div : T.program = [
     right = T.Integer {int = 3L};
     tp = T.Int
   });
-  T.ReturnStm {ret = T.Integer {int = 0L}}
+  T.ReturnStm {ret = Some (T.Integer {int = 0L})}
 ]
 
 let xs = Symbol.symbol "x"
 let xv = T.Lval (T.Var {ident = T.Ident {sym = xs}; tp = T.Int})
 
 (* Input 0 must not cause division by zero. *)
-let test_and_short_circuit : T.program = [
+let test_and_short_circuit : T.program = wrap_main [
   var_decl "x" T.Int read_int;
   T.IfThenElseStm {
     cond = T.BinOp {
@@ -275,7 +286,7 @@ let test_and_short_circuit : T.program = [
     thbr = print_int 1;
     elbro = Some (print_int 2)
   };
-  T.ReturnStm {ret = T.Integer {int = 0L}}
+  T.ReturnStm {ret = Some (T.Integer {int = 0L})}
 ]
 
 (* Change current to select a program. Run with "make test". *)

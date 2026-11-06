@@ -1,0 +1,13 @@
+// Expected output: 30
+// Expected exit code: 0
+
+int add(x: int, y: int) {
+    return x + y;
+}
+
+int main() {
+    var res = add(10, 20);
+    print_integer(res);
+    return 0;
+}
+

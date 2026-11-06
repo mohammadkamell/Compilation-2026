@@ -4,18 +4,20 @@
 // Expected output: 20 10 1
 // Expected exit code: 0
 
-var x = 10;
-{
-    var x = 20;
-    print_integer(x);
-}
-print_integer(x);
-
-{
-    var x = true;
-    if (x) {
-        print_integer(1);
+int main() {
+    var x = 10;
+    {
+        var x = 20;
+        print_integer(x);
     }
-}
+    print_integer(x);
 
-return 0;
+    {
+        var x = true;
+        if (x) {
+            print_integer(1);
+        }
+    }
+
+    return 0;
+}

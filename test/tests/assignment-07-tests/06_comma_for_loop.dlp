@@ -1,0 +1,11 @@
+// Expected output: 0 9 1 8 2 7 3 6
+// Expected exit code: 0
+
+int main() {
+    for (var i: int = 0, j: int = 9; i < 4; i = i + 1, j = j - 1) {
+        print_integer(i);
+        print_integer(j);
+    }
+    return 0;
+}
+

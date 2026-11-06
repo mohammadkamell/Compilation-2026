@@ -2,5 +2,7 @@
 // Semantic error: unknown_function is not declared.
 // Expected: semantic error, compiler returns None.
 
-unknown_function(1, 2);
-return 0;
+int main() {
+    unknown_function(1, 2);
+    return 0;
+}

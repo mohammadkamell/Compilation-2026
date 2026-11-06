@@ -1,0 +1,16 @@
+// Expected output: 100 1
+// Expected exit code: 0
+
+int scale(x: int) {
+    x = x * 10;
+    return x;
+}
+
+int main() {
+    var a = 10;
+    var b = scale(a);
+    print_integer(b);
+    print_integer(a / 10);
+    return 0;
+}
+

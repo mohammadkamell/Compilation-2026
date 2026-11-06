@@ -84,5 +84,9 @@ let () =
   let as5_p, as5_f = test_syntax_negative_dir "test/tests/assignment-05-tests" in
   Printf.printf "Assignment 5 negative: %d passed, %d failed\n\n" as5_p as5_f;
 
-  if pos_f > 0 || neg_f > 0 || as5_f > 0 then exit 1
-  else Printf.printf "=== All %d tests passed in Lexer + Parser test suite! ===\n" (pos_p + neg_p + as5_p)
+  Printf.printf "=== Testing Assignment 7 Phase 4 Positive Tests ===\n";
+  let as7_p, as7_f = test_dir "test/tests/assignment-07-tests" in
+  Printf.printf "Assignment 7 positive: %d passed, %d failed\n\n" as7_p as7_f;
+
+  if pos_f > 0 || neg_f > 0 || as5_f > 0 || as7_f > 0 then exit 1
+  else Printf.printf "=== All %d tests passed in Lexer + Parser test suite! ===\n" (pos_p + neg_p + as5_p + as7_p)

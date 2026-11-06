@@ -3,11 +3,13 @@
 // Expected output: 20 10
 // Expected exit code: 0
 
-var x = 10;
-{
-    var x = 20;
+int main() {
+    var x = 10;
+    {
+        var x = 20;
+        print_integer(x);
+    }
     print_integer(x);
-}
-print_integer(x);
 
-return 0;
+    return 0;
+}

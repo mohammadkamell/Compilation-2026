@@ -1,0 +1,21 @@
+// Expected output: 10 20
+// Expected exit code: 0
+
+bool is_positive(x: int) {
+    return x > 0;
+}
+
+int check(x: int) {
+    if (is_positive(x)) {
+        return 10;
+    } else {
+        return 20;
+    }
+}
+
+int main() {
+    print_integer(check(5));
+    print_integer(check(-3));
+    return 0;
+}
+

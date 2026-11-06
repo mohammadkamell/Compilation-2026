@@ -2,7 +2,9 @@
 // Expected output: 11 22 1
 // Expected exit code: 0
 
-var x = 1;
-{ var x = x + 10, y = x * 2; print_integer(x); print_integer(y); }
-print_integer(x);
-return 0;
+int main() {
+    var x = 1;
+    { var x = x + 10, y = x * 2; print_integer(x); print_integer(y); }
+    print_integer(x);
+    return 0;
+}

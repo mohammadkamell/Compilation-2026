@@ -2,6 +2,8 @@
 // Semantic error: x is int, but assigned a bool.
 // Expected: semantic error, compiler returns None.
 
-var x = 10;
-x = true;
-return 0;
+int main() {
+    var x = 10;
+    x = true;
+    return 0;
+}

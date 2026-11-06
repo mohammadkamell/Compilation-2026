@@ -2,5 +2,7 @@
 // Semantic error: && requires boolean operands, integers are not valid.
 // Expected: semantic error, compiler returns None.
 
-var x = 1 && 2;
-return 0;
+int main() {
+    var x = 1 && 2;
+    return 0;
+}

@@ -1,0 +1,14 @@
+// Expected output: 99
+// Expected exit code: 0
+
+int test_ret() {
+    var a = 0;
+    return (a = 99, a);
+}
+
+int main() {
+    var x = test_ret();
+    print_integer(x);
+    return 0;
+}
+

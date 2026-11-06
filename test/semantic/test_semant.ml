@@ -57,9 +57,11 @@ let op_neg = A.Neg {loc}     let op_lnot = A.Lnot {loc}
    body, so they wrap the statements in int main() { ... }. This matches the
    temporary semantic analysis, which only checks the body of main. *)
 let typecheck stms =
-  Semant.typecheck_prog
+  match Semant.typecheck_prog
     [A.FunDecl {A.ret = A.RetTyp ty_int; A.funname = id "main";
-                A.params = []; A.body = stms; A.loc = loc}]
+                A.params = []; A.body = stms; A.loc = loc}] with
+  | [T.FunDecl f] -> f.body
+  | _ -> fail "expected single function"
 
 (* ------------------------------------------------------------------------
    Expected typed-AST builders. These do not call semantic analysis.
@@ -77,7 +79,7 @@ let tdecl name tp body = T.Declaration {name = tid name; tp; body}
 let tdecls ds = T.VarDeclStm (T.DeclBlock ds)
 let texpr value = T.ExprStm {expr = Some value}
 let tblock stms = T.CompoundStm {stms}
-let tret value = T.ReturnStm {ret = value}
+let tret value = T.ReturnStm {ret = Some value}
 let tprogram stms = stms @ [tret (tint 0)]
 
 (* ------------------------------------------------------------------------

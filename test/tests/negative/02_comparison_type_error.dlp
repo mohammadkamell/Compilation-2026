@@ -2,5 +2,7 @@
 // Semantic error: < requires integer operands, booleans are not valid.
 // Expected: semantic error, compiler returns None.
 
-var x = true < false;
-return 0;
+int main() {
+    var x = true < false;
+    return 0;
+}

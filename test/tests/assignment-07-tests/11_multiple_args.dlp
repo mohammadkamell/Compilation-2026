@@ -1,0 +1,17 @@
+// Expected output: 42
+// Expected exit code: 0
+
+int combine(a: int, b: int, c: int, d: int, flag: bool) {
+    if (flag) {
+        return a + b + c + d;
+    } else {
+        return 0;
+    }
+}
+
+int main() {
+    var r = combine(10, 20, 5, 7, true);
+    print_integer(r);
+    return 0;
+}
+

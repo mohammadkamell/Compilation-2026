@@ -3,5 +3,7 @@
 // Semantic error: variable type cannot be Void.
 // Expected: semantic error, compiler returns None.
 
-var x = print_integer(42);
-return 0;
+int main() {
+    var x = print_integer(42);
+    return 0;
+}

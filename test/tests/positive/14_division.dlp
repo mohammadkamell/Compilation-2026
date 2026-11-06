@@ -4,13 +4,15 @@
 // Expected output: 5 3 -3
 // Expected exit code: 0
 
-var a = 10 / 2;
-print_integer(a);
+int main() {
+    var a = 10 / 2;
+    print_integer(a);
 
-var b = 10 / 3;
-print_integer(b);
+    var b = 10 / 3;
+    print_integer(b);
 
-var c = -10 / 3;
-print_integer(c);
+    var c = -10 / 3;
+    print_integer(c);
 
-return 0;
+    return 0;
+}
