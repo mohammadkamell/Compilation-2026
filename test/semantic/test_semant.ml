@@ -57,11 +57,14 @@ let op_neg = A.Neg {loc}     let op_lnot = A.Lnot {loc}
    body, so they wrap the statements in int main() { ... }. This matches the
    temporary semantic analysis, which only checks the body of main. *)
 let typecheck stms =
-  match Semant.typecheck_prog
+  Semant.typecheck_prog
     [A.FunDecl {A.ret = A.RetTyp ty_int; A.funname = id "main";
-                A.params = []; A.body = stms; A.loc = loc}] with
-  | [T.FunDecl f] -> f.body
-  | _ -> fail "expected single function"
+                A.params = []; A.body = stms; A.loc = loc}]
+
+let typecheck_body stms =
+  match typecheck stms with
+  | [T.FunDecl {T.body = body; _}] -> body
+  | _ -> fail "expectet exactly one function"
 
 (* ------------------------------------------------------------------------
    Expected typed-AST builders. These do not call semantic analysis.
@@ -79,15 +82,18 @@ let tdecl name tp body = T.Declaration {name = tid name; tp; body}
 let tdecls ds = T.VarDeclStm (T.DeclBlock ds)
 let texpr value = T.ExprStm {expr = Some value}
 let tblock stms = T.CompoundStm {stms}
-let tret value = T.ReturnStm {ret = Some value}
-let tprogram stms = stms @ [tret (tint 0)]
+let tret value = T.ReturnStm {ret = Some value} let tprogram stms = stms @ [tret (tint 0)] 
+let tmain body =   [T.FunDecl { T.funname = T.Ident {sym = Symbol.symbol "main"};
+ret = T.RetTyp T.Int;
+params = [];
+body }]
 
 (* ------------------------------------------------------------------------
    Assertions
    ------------------------------------------------------------------------ *)
-let expect_typed source expected =
-  equal "program structure, order, identifiers, and type annotations"
-    expected (typecheck source)
+let expect_typed source expected = 
+  equal "program structure, order, identifiers, and type annotations" 
+  (tmain expected) (typecheck source)
 
 let contains text sub =
   let n = String.length text and m = String.length sub in
@@ -133,9 +139,8 @@ let declarations_tests = [
     expect_typed (program [decls []]) (tprogram [tdecls []]));
   "declaration block agrees with separate declarations", (fun () ->
     let ds = [decl "x" (int 2); decl "z" (bin (var "x") op_plus (int 5))] in
-    let grouped = typecheck [decls ds; ret (var "z")] in
-    let separate = typecheck [decls [List.hd ds];
-                                         decls [List.nth ds 1]; ret (var "z")] in
+    let grouped = typecheck_body [decls ds; ret (var "z")] in     
+    let separate = typecheck_body [decls [List.hd ds];decls [List.nth ds 1]; ret (var "z")] in
     match grouped, separate with
     | [T.VarDeclStm (T.DeclBlock actual); grouped_return],
       [T.VarDeclStm (T.DeclBlock [first]); T.VarDeclStm (T.DeclBlock [second]); separate_return] ->
