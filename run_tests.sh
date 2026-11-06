@@ -8,8 +8,9 @@ COMPILER="./_build/default/bin/main.exe"
 POSITIVE_DIR="test/tests/positive"
 NEGATIVE_DIR="test/tests/negative"
 ASSIGNMENT5_NEGATIVE_TEST_DIR="test/tests/assignment-05-tests"
+ASSIGNMENT7_TEST_DIR="test/tests/assignment-07-tests"
 
-PHASE=3
+PHASE=4
 
 pass=0
 fail=0
@@ -20,8 +21,8 @@ TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 run_positive() {
     local f="$1"
     local expected exp_code code actual
-    expected=$(sed -n 's|^// Expected output: *||p' "$f" | head -n 1)
-    exp_code=$(sed -n 's|^// Expected exit code: *||p' "$f" | head -n 1)
+    expected=$(sed -n 's|^// Expected output: *||p' "$f" | head -n 1 | tr -d '\r')
+    exp_code=$(sed -n 's|^// Expected exit code: *||p' "$f" | head -n 1 | tr -d '\r')
     exp_code=${exp_code:-0}
 
     if ! "$COMPILER" compile --phase "$PHASE" "$f" > "$TMP/out.ll" 2> /dev/null; then
@@ -85,6 +86,13 @@ echo "=== ASSIGNMENT 5 (NEGATIVE TESTS) ==="
 for f in "$ASSIGNMENT5_NEGATIVE_TEST_DIR"/*.dlp; do
   [ -e "$f" ] || continue
   run_negative "$f"
+done
+
+echo ""
+echo "=== ASSIGNMENT 7 (PHASE 4 POSITIVE TESTS) ==="
+for f in "$ASSIGNMENT7_TEST_DIR"/*.dlp; do
+  [ -e "$f" ] || continue
+  run_positive "$f"
 done
 
 echo ""
