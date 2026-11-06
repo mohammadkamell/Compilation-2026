@@ -19,11 +19,11 @@ type error =
   | ContinueOutsideLoop of {loc : Loc.location}
   | MissingReturn of {loc : Loc.location option}
   | DuplicateFunction of {name : string; loc : Loc.location}
-  | DuplicateParameter of {name : string; loc : Loc.location}
+  | DuplicateParam of {name : string; loc : Loc.location}
   | MainMissing
-  | MainBadSignature of {loc : Loc.location}
-  | ReturnValueInVoid of {loc : Loc.location}
-  | ReturnWithoutValue of {loc : Loc.location}
+  | MainBadSignatatur of {loc : Loc.location}
+  | ReturnValInVoid of {loc : Loc.location}
+  | ReturnWithoutVal of {loc : Loc.location}
 
 (* "file:line:column", using the start position of the location. *)
 let loc_to_string (loc : Loc.location) : string =
@@ -59,12 +59,13 @@ let message = function
   | BreakOutsideLoop _ -> "break statement outside of a loop"
   | ContinueOutsideLoop _ -> "continue statement outside of a loop"
   | MissingReturn _ -> "function must return a value on all paths"   
-  | DuplicateFunction {name; _} ->   Printf.sprintf "function '%s' is declared more than once" name   
-  | DuplicateParameter {name; _} ->   Printf.sprintf "parameter '%s' is declared more than once" name   
-  | MainMissing -> "the program must contain a function 'main'"   
-  | MainBadSignature _ -> "main must have return type int and no arguments"   
-  | ReturnValueInVoid _ -> "a void function cant return a value"   
-  | ReturnWithoutValue _ -> "a non void function must return a value"
+  | DuplicateFunction {name; _} ->   Printf.sprintf "function '%s' is declared more than one time" name   
+  | DuplicateParam {name; _} ->   Printf.sprintf "The parameter '%s' is declared more than once" name   
+  | MainMissing -> "the program should contain a function 'main'"   
+  | ReturnWithoutVal _ -> "an non void function should return a val"
+  | ReturnValInVoid _ -> "a void function cant return a value"
+  | MainBadSignatatur _ -> "main should have return type int and no argument"  
+   
   
 
 let location_of = function
@@ -81,13 +82,13 @@ let location_of = function
   | BreakOutsideLoop { loc }
   | ContinueOutsideLoop { loc }
   | DuplicateFunction { loc; _ }
-  | DuplicateParameter { loc; _ }
-  | MainBadSignature { loc }
-  | ReturnValueInVoid { loc }
-  | ReturnWithoutValue { loc } ->
+  | DuplicateParam { loc; _ }
+  | MainBadSignatatur { loc }
+  | ReturnValInVoid { loc }
+  | ReturnWithoutVal { loc } ->
       Some loc
-  | MissingReturn { loc } -> loc
   | MainMissing -> None
+  | MissingReturn { loc } -> loc
 
 (* e.g. "prog.dlp:3:5: error: unbound identifier 'y'" *)
 let error_to_string err =
