@@ -316,7 +316,7 @@ print_summary() {
     local total_checks=${#CHECK_STATUS[@]}
     local failed_checks=0
     for status in "${CHECK_STATUS[@]}"; do
-        ((failed_checks += status))
+        failed_checks=$((failed_checks + status))
     done
     local passed_checks=$((total_checks - failed_checks))
     
