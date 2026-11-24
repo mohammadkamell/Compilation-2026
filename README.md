@@ -139,7 +139,7 @@ The compiler prints LLVM IR on stdout. Link it with the C runtime using clang:
 
 ```bash
 dune exec dolphin -- compile --phase 3 prog.dlp > prog.ll
-clang prog.ll src/runtime/runtime.c -o prog
+clang prog.ll src/runtime/runtime.c src/runtime/stdlib.c -o prog
 ./prog; echo "exit code: $?"
 ```
 

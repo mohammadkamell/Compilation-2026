@@ -4,6 +4,59 @@ module B = CfgBuilder
 module Sym = Symbol
 
 
+(* ---------------------------------------------- 
+   Runtime and standard library (phase 5)
+   ---------------------------------------------- *)
+let ptr = L.Ptr (* printed as "ptr": LLVM pointers are untyped *)
+
+(* Signatures of all external functions: *)
+let external_functions : (string * L.fty) list = [
+  (* runtime *)
+  "compare_strings",                        ([ptr; ptr], L.I64);
+  "allocate_record",                        ([L.I32], ptr);
+  "raw_allocate_on_heap",                   ([L.I32], ptr);
+  "allocate_array",                         ([L.I32; L.I64; ptr], ptr);
+  "report_error_array_index_out_of_bounds", ([], L.Void);
+  "report_error_nil_access",                ([], L.Void);
+  "report_error_division_by_zero",          ([], L.Void);
+  (* standard library *)
+  "bytes_array_to_string", ([ptr], ptr);
+  "string_to_bytes_array", ([ptr], ptr);
+  "byte_to_int_unsigned",  ([L.I8], L.I64);
+  "byte_to_int_signed",    ([L.I8], L.I64);
+  "int_to_byte_unsigned",  ([L.I64], L.I8);
+  "int_to_byte_signed",    ([L.I64], L.I8);
+  "ascii_ord",             ([ptr], L.I64);
+  "ascii_chr",             ([L.I64], ptr);
+  "string_concat",         ([ptr; ptr], ptr);
+  "substring",             ([ptr; L.I64; L.I64], ptr);
+  "int_to_string",         ([L.I64], ptr);
+  "string_to_int",         ([ptr], L.I64);
+  "input_byte",            ([ptr], L.I64);
+  "output_byte",           ([L.I8; ptr], L.I1);
+  "input_bytes_array",     ([L.I64; ptr], ptr);
+  "output_bytes_array",    ([ptr; ptr], L.Void);
+  "output_string",         ([ptr; ptr], L.Void);
+  "seek_in_file",          ([L.I64; L.I1; ptr], L.I1);
+  "pos_in_file",           ([ptr], L.I64);
+  "close_file",            ([ptr], L.I1);
+  "flush_file",            ([ptr], L.I1);
+  "error_in_file",         ([ptr], L.I1);
+  "end_of_file",           ([ptr], L.I1);
+  "get_eof",               ([], L.I64);
+  "open_file",             ([ptr; ptr], ptr);
+  "get_stdin",             ([], ptr);
+  "get_stderr",            ([], ptr);
+  "get_stdout",            ([], ptr);
+  "get_cmd_args",          ([], ptr);
+  "exit",                  ([L.I64], L.Void);
+  (* kept from earlier phases (still in stdlib.c) *)
+  "print_integer",         ([L.I64], L.Void);
+  "read_integer",          ([], L.I64);
+]
+
+
+
 (* Environment : Maps a source variavble to register + llvm type*)
 type env = (L.uid * L.ty) Sym.Table.t
 let empty_env : env = Sym.Table.empty
@@ -14,12 +67,12 @@ let fresh (prefix : string ) : Sym.symbol =
   incr counter;
   Sym.symbol (prefix ^"_"^ string_of_int !counter)
 
-(* Name resolution for functions in LLVM *)
+
+(* External functions keep their C names; all Dolphin functions, including
+   main, get the prefix dolphin_fun_ (the runtime calls dolphin_fun_main). *)
 let llvm_fun_name (name : string) : string =
-  match name with
-  | "main" -> "dolphin_main"
-  | "print_integer" | "read_integer" | "dolphin_div_by_zero" -> name
-  | _ -> "dolphin_fun_" ^ name
+  if List.mem_assoc name external_functions then name
+  else "dolphin_fun_" ^ name
 
 
 (* Type mapping (bottom up approach)*)
@@ -98,8 +151,7 @@ let rec trans_expr (env: env) (e: T.expr) (b: B.cfg_builder) : B.cfg_builder * L
          let b4 = B.term_block (L.Cbr (L.Id is_zero, err_lbl, ok_lbl)) b3 in
          (* Error block *)
          let b5 = B.start_block err_lbl b4 in
-         let b6 = B.add_insn (None, L.Call (L.Void, L.Gid (Sym.symbol "dolphin_div_by_zero"), [])) b5 in
-         let b7 = B.term_block L.Unreachable b6 in
+         let b6 = B.add_insn (None, L.Call (L.Void, L.Gid (Sym.symbol "report_error_division_by_zero"), [])) b5 in         let b7 = B.term_block L.Unreachable b6 in
          (* Ok block *)
          let b8 = B.start_block ok_lbl b7 in
          let temp = fresh "temp" in 
@@ -315,11 +367,10 @@ let trans_fundecl (T.FunDecl {ret; funname = T.Ident {sym}; params; body}) : Sym
 
 let codegen_prog (prog: T.program) : L.prog = 
   let fdecls = List.map (fun (T.FunDecl _ as fd) -> trans_fundecl fd) prog in 
-  { L.tdecls = [];
-    extgdecls = [];
-    gdecls = []; 
-    extfuns = [ (Sym.symbol "print_integer", ([L.I64], L.Void));
-                (Sym.symbol "read_integer", ([], L.I64));
-                (Sym.symbol "dolphin_div_by_zero", ([], L.Void)) ];
+  { L.tdecls = [ (Sym.symbol "dolphin_record_stream", L.Struct []);
+                 (Sym.symbol "array_type", L.Struct [L.I64; L.Array (0, L.I8)]) ];
+    extgdecls = [ (Sym.symbol "dolphin_rc_empty_string", L.Namedt (Sym.symbol "array_type")) ];
+    gdecls = [];
+    extfuns = List.map (fun (name, fty) -> (Sym.symbol name, fty)) external_functions;
     fdecls;
   }
