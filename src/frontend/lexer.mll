@@ -10,6 +10,7 @@ let error lexbuf msg =
 let string_of_token = function
   | EOF -> "EOF"
   | INT_LIT i -> Printf.sprintf "INT_LIT(%Ld)" i
+  | STRING_LIT s -> Printf.sprintf "STRING_LIT(%S)" s
   | TRUE -> "TRUE"
   | FALSE -> "FALSE"
   | LENGTHOF -> "LENGTHOF"
@@ -97,6 +98,11 @@ rule token = parse
       with Failure _ ->
         error lexbuf (Printf.sprintf "Integer literal '%s' out of range." s)
     }
+  
+| '"' {
+  let buf = Buffer.create 18 in 
+      string_literal buf lexbuf
+  }
 
   (* Identifiers *)
   | ident as id   { IDENT id }
@@ -149,6 +155,47 @@ and multi_line_comment depth = parse
   | newline       { Lexing.new_line lexbuf; multi_line_comment depth lexbuf }
   | eof           { error lexbuf "file ended before multi-line comment ended." }
   | _             { multi_line_comment depth lexbuf }
+
+and string_literal buf = parse
+  | '"' {
+      try STRING_LIT (Scanf.unescaped (Buffer.contents buf))
+      with Scanf.Scan_failure msg -> error lexbuf msg
+    }
+
+  
+
+  | '\\' newline whitespace* {
+      Lexing.new_line lexbuf;
+      string_literal buf lexbuf
+    }
+    
+  | '\\' _ as s {
+      Buffer.add_string buf s;
+      string_literal buf lexbuf
+    }
+
+  | newline {
+      Lexing.new_line lexbuf;
+      Buffer.add_char buf '\n';
+      string_literal buf lexbuf
+    }
+
+  | '\\' {
+      error lexbuf "Unterminated escape sequence."
+    }
+
+  | '\r' {
+      error lexbuf "Invalid newline in string literal."
+    }
+
+  | eof {
+      error lexbuf "Unterminated string literal."
+    }
+
+  | _ as c {
+      Buffer.add_char buf c;
+      string_literal buf lexbuf
+    }
 
 {
 let tokenize_from_lexbuf lexbuf =

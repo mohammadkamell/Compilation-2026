@@ -7,6 +7,8 @@
 %token EOF
 // integer literals
 %token <int64> INT_LIT
+// string literals
+%token <string> STRING_LIT
 // booleans
 %token TRUE FALSE
 // length operation; for arrays and strings
@@ -49,6 +51,7 @@
 %left PLUS MINUS
 %left MUL DIV REM
 %nonassoc UNARY
+%left DOT LBRACKET
 
 %%
 
@@ -57,12 +60,24 @@
 // ---------------------------------------------------------------------------
 
 program:
-  | fs = nonempty_list(fundecl) EOF { fs }
+  | ds = nonempty_list(toplevel) EOF {ds}
+
+toplevel:
+  | f = fundecl {f}
+  | r = recorddecl {r}
 
 fundecl:
   | ret = rettyp name = ident LPAREN params = separated_list(COMMA, param) RPAREN
       LBRACE body = list(statement) RBRACE
-      { FunDecl {ret; funname = name; params; body; loc = Loc.make_location $loc} }
+      { FunDecl {ret; funname = name; params; body; loc = Loc.make_location $loc}}
+
+recorddecl:
+ | RECORD name = recordname LBRACE fields = list(record_field) RBRACE
+ {RecDecl{recname = name; fields; loc = Loc.make_location $loc}}
+
+record_field:
+ | name = fieldname COLON t = typ SEMICOLON
+ {(name, t)}
 
 rettyp:
   | VOID    { Void {loc = Loc.make_location $loc} }
@@ -112,6 +127,12 @@ single_decl:
 typ:
   | INT  { Int  {loc = Loc.make_location $loc} }
   | BOOL { Bool {loc = Loc.make_location $loc} }
+  | STRING { Str {loc = Loc.make_location $loc} }
+  | BYTE { Byte {loc = Loc.make_location $loc} }
+  | LBRACKET t = typ RBRACKET
+    {Array {typ = t; loc = Loc.make_location $loc}}
+  | name = recordname
+    {Record{recordname = name}}
 
 for_init:
   | e = comma_expr  { FIExpr e }                              // phase 4: comma
@@ -132,8 +153,10 @@ comma_expr:                                                   // phase 4: comma
 
 expr:
   | i = INT_LIT                 { Integer {int = i; loc = Loc.make_location $loc} }
-  | TRUE                        { Boolean {bool = true; loc = Loc.make_location $loc} }
+  | TRUE                        { Boolean {bool = true; loc = Loc.make_location $loc}}
   | FALSE                       { Boolean {bool = false; loc = Loc.make_location $loc} }
+  | s = STRING_LIT{ String {string = s; loc = Loc.make_location $loc}}
+  | NIL { Nil {loc = Loc.make_location $loc} }
   | lv = lval                   { Lval lv }
   | LPAREN e = comma_expr RPAREN { e }                        // phase 4: comma
   | l = expr op = binop r = expr
@@ -148,6 +171,14 @@ expr:
       { Assignment {lvl = lv; rhs = e; loc = Loc.make_location $loc} }
   | f = ident LPAREN args = separated_list(COMMA, expr) RPAREN
       { Call {fname = f; args; loc = Loc.make_location $loc} }
+  | LENGTHOF LPAREN e = comma_expr RPAREN
+    {LengthOf{expr = e;loc = Loc.make_location $loc}}
+  | NEW name = recordname LBRACE fields =list(field_init) RBRACE
+  {Rcrd {rcrdtp = name; fields;loc = Loc.make_location $loc}}
+  | NEW t = typ LBRACKET len = comma_expr RBRACKET
+    {Arr{tp = t;len;loc = Loc.make_location $loc}}
+
+  
 
 %inline binop:
   | PLUS  { Plus  {loc = Loc.make_location $loc} }
@@ -165,7 +196,22 @@ expr:
   | LOR   { Lor   {loc = Loc.make_location $loc} }
 
 lval:
-  | id = ident { Var id }
+ | id = ident { Var id }
+ | a = expr LBRACKET i = comma_expr RBRACKET
+ {Idx {arr=a; index = i; loc =Loc.make_location $loc}}
+ | r = expr DOT f= fieldname
+ {Fld{rcrd = r; field = f; loc = Loc.make_location $loc}}
 
 ident:
   | name = IDENT { Ident {name; loc = Loc.make_location $loc} }
+
+recordname:
+ | name = IDENT {RecordName{name; loc = Loc.make_location $loc}}
+
+fieldname:
+ | name =IDENT {FieldName{name; loc = Loc.make_location $loc}}
+
+field_init:
+  | name = fieldname ASSIGN e = expr SEMICOLON
+      {(name, e)}
+
