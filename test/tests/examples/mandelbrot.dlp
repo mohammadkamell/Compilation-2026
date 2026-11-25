@@ -1,0 +1,59 @@
+/* fix comma arithmetics
+precision q = 8192 i.e. 13 bits for the decimal part */
+
+int add(x: int, y: int) {
+    return x + y;
+}
+int sub(x: int, y: int) {
+    return x - y;
+}
+int mul(x: int, y: int) {
+    var t = x * y;
+    return (t + 8192 / 2) / 8192;
+}
+int div(x: int, y: int) {
+    var t = x * 8192;
+    return (t + y / 2) / y;
+}
+int of_int(x: int) {
+    return x * 8192;
+}
+
+bool iter(n: int, a: int, b: int, xn: int, yn: int) {
+    if (n == 100) return true;
+    var xn2 = mul(xn, xn);
+    var yn2 = mul(yn, yn);
+    if (add(xn2, yn2) > of_int(4)) return false;
+    return iter(n+1, a, b, add(sub(xn2, yn2), a),
+    add(mul(of_int(2), mul(xn, yn)), b));
+}
+
+bool inside(x: int, y: int) {
+    return iter(0, x, y, of_int(0), of_int(0));
+}
+
+int main() {
+    var steps = 30;
+    var xmin = of_int(-2);
+    var xmax = of_int(1);
+    var deltax = div(sub(xmax, xmin), of_int(2 * steps));
+    var ymin = of_int(-1);
+    var ymax = of_int(1);
+    var deltay = div(sub(ymax, ymin), of_int(steps));
+    var i = 0;
+    while (i < steps) {
+      var y = add(ymin, mul(of_int(i), deltay));
+      var j = 0;
+      while (j < 2 * steps) {
+        var x = add(xmin, mul(of_int(j), deltax));
+        if (inside(x, y))
+          output_string("0", get_stdout());
+        else
+          output_string("1", get_stdout());
+        j = j+1;
+      };
+      output_string("\n", get_stdout());
+      i = i+1;
+    };
+    return 0;
+}

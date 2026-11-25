@@ -1,0 +1,130 @@
+
+[int] makepair(k: int, l : int){ 
+    var res = new int[3];
+    res[0] = k; res[1] = l; res[2] = 0;
+    return res;
+}
+
+void initpair(p: [int], valx: int, valy: int) {
+    p[0] = valx; p[1] = valy; p[2] = 0;
+}
+
+void incrpair(p: [int], size : int){
+    p[0] = p[0] + 1;
+    if (p[0] % size == 0) {
+        p[0] = p[0] - size;
+        p[1] = p[1] + 1;
+    };
+    p[2] = p[2] + 1;
+}
+
+[bool] possible_values(i:int, j:int, tab:[[int]]) {
+    var res = new bool[10];
+    var k = 0;
+    for (;k<10;k=k+1) res[k]=true;
+    for (k=0; k<9; k=k+1) {
+        res[tab[i][k]] = false;
+        res[tab[k][j]] = false;
+    }
+    var k = makepair(0,0);
+    for (initpair(k, (i/3)*3, (j/3)*3); k[2] < 9; incrpair(k, 3)) 
+        res[tab[k[0]][k[1]]] = false;
+    return res;
+}
+
+int count_possible(poss: [bool]) {
+    var res = 0;
+    var i = 1;
+    for(;i<10;i=i+1) if (poss[i]) res = res + 1;
+    return res; 
+}
+
+record bestsofar { val : int; x : int; y : int ; possible : [bool]; }
+
+bestsofar findbest(tab:[[int]]) {
+    var acc = new bestsofar { val = 10; x = 0; y = 0; possible = nil;};
+    var k = makepair(0,0);
+    for(initpair(k, 0, 0); k[2] < 81; incrpair(k, 9)) {
+        if (tab[k[0]][k[1]] == 0) { 
+            var poss = possible_values(k[0], k[1], tab); 
+            var count = count_possible(poss);
+            if (count < acc.val) {
+                acc.val = count;
+                acc.x = k[0];
+                acc.y = k[1];
+                acc.possible = poss;
+            }
+        }
+    };
+    return acc;
+}
+
+bool solve(tab:[[int]]) { 
+    var best = findbest(tab);
+    if (best.val == 10) return true;
+    var i = 1;
+    for (;i<10; i=i+1) {
+        if (best.possible[i]) {
+            tab[best.x][best.y] = i;
+            if (solve(tab)) return true;
+        }
+    };
+    tab[best.x][best.y] = 0;
+    return false;
+}
+
+void print_grid(tab:[[int]]) {
+    var ints = new string[10];
+    ints[0] = " |"; ints[1] = "1|"; ints[2] = "2|"; ints[3] = "3|"; ints[4] = "4|"; ints[5] = "5|"; ints[6] = "6|"; ints[7] = "7|"; ints[8] = "8|"; ints[9] = "9|";
+    var i = 0;
+    for (;i<9; i = i+1) {
+        output_string("|", get_stdout());
+        var j = 0;
+        for (;j<9; j = j+1) {
+            output_string(ints[tab[i][j]], get_stdout());
+        };
+        output_string("\n", get_stdout());
+    };
+    output_string("\n", get_stdout());
+}
+
+
+
+int main(){
+    var grid = new [int][9];
+    var i = 0;
+    for (;i<9; i=i+1) {
+        grid[i] = new int[9];
+        var j = 0;
+        for(;j<9; j=j+1) {
+            grid[i][j] = 0;
+        };
+    };
+    grid[0][0] = 9;
+    grid[0][2] = 3;
+    grid[0][4] = 8;
+    grid[1][1] = 6;
+    grid[1][3] = 1;
+    grid[1][6] = 7;
+    grid[1][7] = 3;
+    grid[2][8] = 4;
+    grid[3][3] = 4;
+    grid[3][8] = 6;
+    grid[4][2] = 8;
+    grid[4][4] = 1;
+    grid[4][6] = 5;
+    grid[4][7] = 4;
+    grid[5][1] = 5;
+    grid[5][8] = 2;
+    grid[6][1] = 7;
+    grid[6][3] = 3;
+    grid[6][6] = 1;
+    grid[6][7] = 5;
+    grid[7][2] = 6;
+    grid[7][5] = 7;
+    grid[8][6] = 2;
+    print_grid(grid);
+    solve(grid);
+    print_grid(grid);
+    return 0;
+}

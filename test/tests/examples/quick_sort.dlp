@@ -1,0 +1,57 @@
+void printInt(i : int){
+   output_string(int_to_string(i),get_stdout());
+   output_string("\n",get_stdout());
+}
+
+void swap(i: int, j: int, a:[int]) {
+    var v = a[i];
+    a[i] = a[j];
+    a[j] = v;
+}
+
+
+void quicksort(i: int, j: int, a:[int]) {
+    if (i >= j - 1) return;
+    var p = a[i];
+    var pos = i;
+    var k = i;
+    for (k = k + 1; k < j; k = k + 1) {
+        if (a[k] <= p) {
+            swap(pos+1, k, a);
+            pos = pos + 1;
+        };
+    };
+    swap(i, pos, a);
+    quicksort(i, pos, a);
+    quicksort(pos+1, j, a);
+}
+
+void print_list(l: [int], len: int) {
+    var i = 0;
+    for (;i < len; i = i+1) printInt(l[i]);
+    output_string("\n", get_stdout()); return;
+}
+
+
+int random(s : [int]) { s[0] = (s[0] * 987 + 42) % 5003; return s[0]; }
+
+[int] random_list(n: int) {
+    var l = new int[n];
+    var s = new int[1]; s[0] = 0;
+    var i = 0;
+    for (;i < n; i = i+1) l[i] = random(s);
+    return l;
+}
+
+int main() {
+    var l = new int[5];
+    l[0] = 4; l[1] = 1; l[2] = 2; l[3] = 5; l[4] = 3; 
+    print_list(l, 5);
+    quicksort(0, 5, l);
+    print_list(l, 5);
+    var l2 = random_list(100);
+    print_list(l2, 100);
+    quicksort(0, 100, l2);
+    print_list(l2, 100);
+    return 0;
+}

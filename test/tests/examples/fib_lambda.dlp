@@ -1,0 +1,45 @@
+void printInt(i : int){
+   output_string(int_to_string(i),get_stdout());
+   output_string("\n",get_stdout());
+}
+
+
+record Pair { a: int; b: int; }
+// represents the 2x2 matrix
+//   a+b b
+//    b  a
+
+// everything is computed modulo 10^4
+
+int add(x: int, y: int) { return (x+y) % 10000; }
+int mul(x: int, y: int) { return (x*y) % 10000; }
+
+Pair mulp(x : Pair, y : Pair) {
+    return new Pair { a = add(mul(x.b,y.b),mul(x.a,y.a));
+                      b = add(mul(add(x.a,x.b),y.b), mul(x.b,y.a));};
+}
+
+// computes x^n*y for matrix multiplication by fast exponentiation
+Pair exp(x: Pair, n: int, y: Pair) {
+    if (n == 0) return y;
+    var z : Pair = nil;
+    if (n % 2 == 1)
+        z = mulp(x,y);
+    else
+        z = y;
+    return exp(mulp(x,x), n/2,  z);
+}
+
+
+int fib(n: int) {
+    var i = new Pair{ a = 0; b = 1;};
+    var p = exp(i, n-1, i);
+    return p.b;
+}
+
+int main() {
+    printInt(fib(10)); 
+    printInt(fib(2014)); 
+    printInt(fib(1000000000));
+    return 0;
+}
