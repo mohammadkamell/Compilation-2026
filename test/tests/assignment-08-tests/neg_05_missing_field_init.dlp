@@ -1,0 +1,6 @@
+// All fields must be initialized when a record is created.
+record T { x: int; y: int; }
+int main() {
+  var t = new T { x = 1; };
+  return 0;
+}

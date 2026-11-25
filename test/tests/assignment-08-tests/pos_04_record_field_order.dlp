@@ -1,0 +1,11 @@
+// Fields may be initialized in any order; each value must end up in the right field.
+// Expected output: 1 2 3
+// Expected exit code: 0
+record T { x: int; y: int; z: int; }
+int main() {
+  var t = new T { z = 3; x = 1; y = 2; };
+  print_integer(t.x);
+  print_integer(t.y);
+  print_integer(t.z);
+  return 0;
+}

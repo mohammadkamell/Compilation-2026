@@ -1,0 +1,9 @@
+// Records of different types cannot be compared, even with identical fields.
+record A { x: int; }
+record B { x: int; }
+int main() {
+  var a = new A { x = 1; };
+  var b = new B { x = 1; };
+  if (a == b) return 1;
+  return 0;
+}

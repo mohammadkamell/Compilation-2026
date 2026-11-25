@@ -1,0 +1,3 @@
+// Parser error: fields in a record declaration must be separated by semicolons.
+record T { x: int y: int; }
+int main() { return 0; }

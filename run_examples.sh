@@ -1,8 +1,9 @@
 #!/bin/bash
-# Runs the provided example programs and compares their output with the .out files.
-# A .out file contains the program's standard output followed by its exit code.
+# Runs the example programs provided with the course (test/tests/examples) and
+# compares their output with the .out files. A .out file contains the program's
+# standard output followed by its exit code.
 # Usage: bash run_examples.sh              (our own frontend)
-#        MODE=rescue bash run_examples.sh  (reference parser, while ours is unfinished)
+#        MODE=rescue bash run_examples.sh  (reference parser)
 
 MODE="${MODE:-compile}"
 COMPILER="./_build/default/bin/main.exe"
@@ -11,6 +12,9 @@ TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 pass=0; fail=0
 
 dune build || { echo "Build failed"; exit 1; }
+
+echo ""
+echo "=== EXAMPLE PROGRAMS (provided with the course, $DIR, mode: $MODE) ==="
 
 for f in "$DIR"/*.dlp; do
   base="${f%.dlp}"
@@ -42,5 +46,6 @@ for f in "$DIR"/*.dlp; do
 done
 
 echo ""
-echo "Results: $pass passed, $fail failed"
+echo "========================================"
+echo "Examples: $pass passed, $fail failed out of $((pass + fail))"
 [ "$fail" -eq 0 ]

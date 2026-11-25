@@ -1,4 +1,11 @@
-.PHONY: test clean-test
+.PHONY: test clean-test semanttest tests
+
+MODE ?= compile
+
+tests:
+	MODE=$(MODE) bash run_tests.sh; r1=$$?; \
+	MODE=$(MODE) bash run_examples.sh; r2=$$?; \
+	exit $$((r1 + r2))
 
 test:
 	dune exec ./test/test_codegen.exe > out.ll

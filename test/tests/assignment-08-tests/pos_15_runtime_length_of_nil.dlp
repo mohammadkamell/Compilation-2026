@@ -1,0 +1,9 @@
+// length_of on a nil array is a runtime error (nil access).
+// Expected output: 1
+// Expected exit code: 1
+int main() {
+  var a : [int] = nil;
+  print_integer(1);
+  print_integer(length_of(a));
+  return 0;
+}

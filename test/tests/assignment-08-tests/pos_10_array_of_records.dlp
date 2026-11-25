@@ -1,0 +1,14 @@
+// "new Cell[2]" (array) and "new Cell { ... }" (record) are both parsed correctly,
+// long lval chains like cs[0].next[1] can be read and written, and array elements
+// of record type default to nil.
+// Expected output: 10 1
+// Expected exit code: 0
+record Cell { v: int; next: [int]; }
+int main() {
+  var cs = new Cell[2];
+  cs[0] = new Cell { v = 1; next = new int[2]; };
+  cs[0].next[1] = 9;
+  print_integer(cs[0].v + cs[0].next[1]);
+  if (cs[1] == nil) print_integer(1); else print_integer(0);
+  return 0;
+}

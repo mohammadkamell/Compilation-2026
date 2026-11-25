@@ -1,0 +1,5 @@
+// An array index must be an integer.
+int main() {
+  var a = new int[3];
+  return a[true];
+}

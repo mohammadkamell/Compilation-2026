@@ -1,0 +1,5 @@
+// Reserved records (here stream) cannot be created with new.
+int main() {
+  var s = new stream { };
+  return 0;
+}

@@ -1,0 +1,4 @@
+// Record names must be unique.
+record T { x: int; }
+record T { y: int; }
+int main() { return 0; }

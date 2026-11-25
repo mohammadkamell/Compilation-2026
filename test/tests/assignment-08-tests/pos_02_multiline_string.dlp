@@ -1,0 +1,12 @@
+// A string literal may span several lines; the line break is part of the string,
+// so it equals the same string written with \n.
+// Expected output: 1 11
+// Expected exit code: 0
+int main() {
+  var x = "hello
+world";
+  var y = "hello\nworld";
+  if (x == y) print_integer(1); else print_integer(0);
+  print_integer(length_of(x));
+  return 0;
+}

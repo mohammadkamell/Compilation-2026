@@ -1,0 +1,12 @@
+// A record may have zero fields; creating it gives a non-nil value, and two such
+// records are still different references.
+// Expected output: 1 0
+// Expected exit code: 0
+record E { }
+int main() {
+  var e = new E { };
+  var f = new E { };
+  if (e != nil) print_integer(1); else print_integer(0);
+  if (e == f) print_integer(1); else print_integer(0);
+  return 0;
+}

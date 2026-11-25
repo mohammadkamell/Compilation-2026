@@ -1,0 +1,13 @@
+// Strings are compared by value and lexicographically, also when one of them is
+// built at runtime.
+// Expected output: 1 1 1 1 1 0
+// Expected exit code: 0
+int main() {
+  if ("apple" < "banana") print_integer(1); else print_integer(0);
+  if ("abc" == string_concat("ab", "c")) print_integer(1); else print_integer(0);
+  if ("abc" != "abd") print_integer(1); else print_integer(0);
+  if ("b" >= "a") print_integer(1); else print_integer(0);
+  if ("" < "a") print_integer(1); else print_integer(0);
+  if ("z" < "a") print_integer(1); else print_integer(0);
+  return 0;
+}

@@ -1,0 +1,5 @@
+// Lexer error: the string literal is never closed.
+int main() {
+  output_string("abc, get_stdout());
+  return 0;
+}

@@ -1,0 +1,3 @@
+// Field names within a record must be unique.
+record T { x: int; x: bool; }
+int main() { return 0; }

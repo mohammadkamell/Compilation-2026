@@ -1,0 +1,5 @@
+// Arithmetic is not defined on strings.
+int main() {
+  var s = "a" - "b";
+  return 0;
+}

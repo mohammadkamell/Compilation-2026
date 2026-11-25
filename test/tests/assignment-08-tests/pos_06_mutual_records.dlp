@@ -1,0 +1,14 @@
+// Records are mutually recursive: A refers to B and B refers to A (B is declared
+// after its first use), and a cycle can be built at runtime.
+// Expected output: 2 1
+// Expected exit code: 0
+record A { v: int; b: B; }
+record B { w: int; a: A; }
+int main() {
+  var a = new A { v = 1; b = nil; };
+  var b = new B { w = 2; a = a; };
+  a.b = b;
+  print_integer(a.b.a.b.w);
+  print_integer(b.a.v);
+  return 0;
+}

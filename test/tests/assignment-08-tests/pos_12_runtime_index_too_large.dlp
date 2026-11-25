@@ -1,0 +1,10 @@
+// Array writes are bounds-checked: index 3 in an array of length 3 is an error.
+// Expected output: 1
+// Expected exit code: 1
+int main() {
+  var a = new int[3];
+  print_integer(1);
+  a[3] = 5;
+  print_integer(2);
+  return 0;
+}

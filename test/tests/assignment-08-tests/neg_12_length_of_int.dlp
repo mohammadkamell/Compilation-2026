@@ -1,0 +1,4 @@
+// length_of only applies to strings and arrays.
+int main() {
+  return length_of(5);
+}

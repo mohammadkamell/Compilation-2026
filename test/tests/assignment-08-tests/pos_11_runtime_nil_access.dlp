@@ -1,0 +1,12 @@
+// Accessing a field of nil is a runtime error: the program stops with exit code 1
+// before the second print.
+// Expected output: 1
+// Expected exit code: 1
+record P { x: int; }
+int main() {
+  print_integer(1);
+  var p : P = nil;
+  print_integer(p.x);
+  print_integer(2);
+  return 0;
+}

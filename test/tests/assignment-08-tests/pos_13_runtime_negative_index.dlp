@@ -1,0 +1,9 @@
+// Array reads are bounds-checked: a negative index is an error.
+// Expected output: 1
+// Expected exit code: 1
+int main() {
+  var a = new int[3];
+  print_integer(1);
+  print_integer(a[0 - 1]);
+  return 0;
+}

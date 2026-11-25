@@ -1,6 +1,6 @@
-#!/bin/bash
-# Run the Dolphin test corpus using rescue mode.
-# Usage: ./run_tests.sh
+# Runs our own Dolphin test corpus (test/tests/).
+# Usage: bash run_tests.sh              (our own frontend)
+#        MODE=rescue bash run_tests.sh  (reference parser)
 
 set -uo pipefail
 
@@ -9,8 +9,10 @@ POSITIVE_DIR="test/tests/positive"
 NEGATIVE_DIR="test/tests/negative"
 ASSIGNMENT5_NEGATIVE_TEST_DIR="test/tests/assignment-05-tests"
 ASSIGNMENT7_TEST_DIR="test/tests/assignment-07-tests"
+ASSIGNMENT8_TEST_DIR="test/tests/assignment-08-tests"
 
-PHASE=4
+PHASE=5
+MODE="${MODE:-compile}"   # compile = our own frontend, rescue = reference parser
 
 pass=0
 fail=0
@@ -21,11 +23,11 @@ TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 run_positive() {
     local f="$1"
     local expected exp_code code actual
-    expected=$(sed -n 's|^// Expected output: *||p' "$f" | head -n 1 | tr -d '\r')
+    expected=$(sed -n 's|^// Expected output[^:]*: *||p' "$f" | head -n 1 | tr -d '\r')
     exp_code=$(sed -n 's|^// Expected exit code: *||p' "$f" | head -n 1 | tr -d '\r')
     exp_code=${exp_code:-0}
 
-    if ! "$COMPILER" compile --phase "$PHASE" "$f" > "$TMP/out.ll" 2> /dev/null; then
+    if ! "$COMPILER" "$MODE" --phase "$PHASE" "$f" > "$TMP/out.ll" 2> /dev/null; then
         printf "  %-50s \033[31mFAILED (compile)\033[0m\n" "$f"; fail=$((fail + 1)); return
     fi
     if ! clang "$TMP/out.ll" src/runtime/runtime.c src/runtime/stdlib.c -o "$TMP/prog" -Wno-override-module 2> /dev/null; then
@@ -51,7 +53,7 @@ run_positive() {
 
 run_negative() {
     local f="$1"
-    "$COMPILER" compile --phase "$PHASE" "$f" > /dev/null 2>&1
+    "$COMPILER" "$MODE" --phase "$PHASE" "$f" > /dev/null 2>&1
     local code=$?
     if [ "$code" -eq 1 ]; then
         printf "  %-50s \033[32mOK (rejected)\033[0m\n" "$f"
@@ -66,8 +68,9 @@ run_negative() {
 }
 
 echo "Building..."
-dune build
+dune build || { echo "Build failed"; exit 1; }
 echo ""
+echo "Mode: $MODE (phase $PHASE)"
 
 echo "=== POSITIVE TESTS ==="
 for f in "$POSITIVE_DIR"/*.dlp; do
@@ -93,6 +96,20 @@ echo "=== ASSIGNMENT 7 (PHASE 4 POSITIVE TESTS) ==="
 for f in "$ASSIGNMENT7_TEST_DIR"/*.dlp; do
   [ -e "$f" ] || continue
   run_positive "$f"
+done
+
+echo ""
+echo "=== ASSIGNMENT 8 (PHASE 5 POSITIVE TESTS) ==="
+for f in "$ASSIGNMENT8_TEST_DIR"/pos_*.dlp; do
+  [ -e "$f" ] || continue
+  run_positive "$f"
+done
+
+echo ""
+echo "=== ASSIGNMENT 8 (PHASE 5 NEGATIVE TESTS) ==="
+for f in "$ASSIGNMENT8_TEST_DIR"/neg_*.dlp; do
+  [ -e "$f" ] || continue
+  run_negative "$f"
 done
 
 echo ""

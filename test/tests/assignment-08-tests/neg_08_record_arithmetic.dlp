@@ -1,0 +1,7 @@
+// The only binary operations on records are == and !=.
+record T { x: int; }
+int main() {
+  var t = new T { x = 1; };
+  var u = t + t;
+  return 0;
+}

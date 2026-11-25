@@ -1,0 +1,18 @@
+// Arrays of arrays (with different lengths), and default values for int, string
+// and bool elements.
+// Expected output: 3 3 7 0 0 0
+// Expected exit code: 0
+int main() {
+  var m = new [int][3];
+  for (var i = 0; i < 3; i = i + 1) m[i] = new int[i + 1];
+  m[2][2] = 7;
+  print_integer(length_of(m));
+  print_integer(length_of(m[2]));
+  print_integer(m[2][2]);
+  print_integer(m[1][0]);
+  var s = new string[2];
+  print_integer(length_of(s[1]));
+  var b = new bool[1];
+  if (b[0]) print_integer(1); else print_integer(0);
+  return 0;
+}

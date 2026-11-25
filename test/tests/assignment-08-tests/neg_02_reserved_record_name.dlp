@@ -1,0 +1,3 @@
+// Reserved record names cannot be used for user-defined records.
+record stream { x: int; }
+int main() { return 0; }

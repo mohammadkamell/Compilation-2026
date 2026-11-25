@@ -1,0 +1,18 @@
+// Records are compared by reference: an alias sees updates and is equal, a record
+// with the same contents is not. Records can be compared with nil.
+// Expected output: 5 1 0 1 1
+// Expected exit code: 0
+record P { x: int; }
+int main() {
+  var p = new P { x = 1; };
+  var q = p;
+  q.x = 5;
+  print_integer(p.x);
+  var r = new P { x = 5; };
+  if (p == q) print_integer(1); else print_integer(0);
+  if (p == r) print_integer(1); else print_integer(0);
+  var n : P = nil;
+  if (n == nil) print_integer(1); else print_integer(0);
+  if (p != nil) print_integer(1); else print_integer(0);
+  return 0;
+}

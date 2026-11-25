@@ -1,0 +1,5 @@
+// A record type that is never declared.
+int main() {
+  var x : Foo = nil;
+  return 0;
+}

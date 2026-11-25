@@ -1,0 +1,6 @@
+// Accessing a field that the record does not have.
+record T { x: int; }
+int main() {
+  var t = new T { x = 1; };
+  return t.z;
+}

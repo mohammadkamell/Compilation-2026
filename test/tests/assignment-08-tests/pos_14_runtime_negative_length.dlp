@@ -1,0 +1,9 @@
+// Creating an array with negative length is a runtime error.
+// Expected output: 1
+// Expected exit code: 1
+int main() {
+  print_integer(1);
+  var a = new int[0 - 1];
+  print_integer(2);
+  return 0;
+}

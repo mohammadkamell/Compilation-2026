@@ -1,0 +1,6 @@
+// A value stored in an array must have the element type.
+int main() {
+  var a = new int[3];
+  a[0] = "x";
+  return 0;
+}

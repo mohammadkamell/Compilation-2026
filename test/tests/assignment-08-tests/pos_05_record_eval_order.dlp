@@ -1,0 +1,12 @@
+// Field initializers are evaluated in source order (left to right), not in
+// declaration order: f(2) runs before f(1).
+// Expected output: 2 1 1 2
+// Expected exit code: 0
+record T { x: int; y: int; }
+int f(v: int) { print_integer(v); return v; }
+int main() {
+  var t = new T { y = f(2); x = f(1); };
+  print_integer(t.x);
+  print_integer(t.y);
+  return 0;
+}
