@@ -6,19 +6,26 @@ type binding =
   | Var of TAst.typ
   | Fun of TAst.funtype
 
+type record_info = {
+  fields : (string * TAst.typ) list;
+  reserved : bool;
+}
+
 type environment = {
   bindings : (string * binding) list;
+  records : (string * record_info) list;
   loop_depth : int;
 }
 
 let name_of (Ast.Ident {name; _}) = name
 
-(* create an initial environment with the given functions defined *)
-let make_env function_types =
+(* Create an initial environment with the given functions and records defined. *)
+let make_env ?(record_types = []) function_types =
   { bindings = List.map (fun (name, ft) -> (name, Fun ft)) function_types;
+    records = record_types;
     loop_depth = 0 }
 
-(* insert a local declaration into the environment *)
+(* Insert a local declaration into the environment. *)
 let insert_local_decl env sym typ =
   { env with bindings = (name_of sym, Var typ) :: env.bindings }
 
@@ -28,8 +35,15 @@ let enter_loop env = { env with loop_depth = env.loop_depth + 1 }
 
 let is_inside_loop env = env.loop_depth > 0
 
-(* lookup variables and functions. Note: it must first look for a local variable and if not found then look for a function. *)
+(* Lookup variables and functions. Note: it must first look for a local variable
+   and if not found then look for a function. *)
 let lookup_var_fun env sym =
   match List.assoc_opt (name_of sym) env.bindings with
   | Some binding -> binding
-  | None -> failwith ("unbond: " ^ name_of sym)
+  | None -> failwith ("unbound: " ^ name_of sym)
+
+let lookup_record env name =
+  List.assoc_opt name env.records
+
+let lookup_field (info : record_info) field_name =
+  List.assoc_opt field_name info.fields
