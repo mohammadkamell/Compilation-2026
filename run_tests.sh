@@ -15,7 +15,7 @@ PHASE=4
 pass=0
 fail=0
 
-RUNTIME="src/runtime/runtime.c"
+
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 
 run_positive() {
@@ -28,7 +28,7 @@ run_positive() {
     if ! "$COMPILER" compile --phase "$PHASE" "$f" > "$TMP/out.ll" 2> /dev/null; then
         printf "  %-50s \033[31mFAILED (compile)\033[0m\n" "$f"; fail=$((fail + 1)); return
     fi
-    if ! clang "$TMP/out.ll" "$RUNTIME" -o "$TMP/prog" -Wno-override-module 2> /dev/null; then
+    if ! clang "$TMP/out.ll" src/runtime/runtime.c src/runtime/stdlib.c -o "$TMP/prog" -Wno-override-module 2> /dev/null; then
         printf "  %-50s \033[31mFAILED (clang)\033[0m\n" "$f"; fail=$((fail + 1)); return
     fi
 

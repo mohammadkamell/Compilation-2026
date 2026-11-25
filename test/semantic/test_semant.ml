@@ -395,9 +395,200 @@ let error_collection_tests = [
       [ret (A.Lval (A.Var (A.Ident {name = "nope"; loc = at})))])
 ]
 
+let rec_id name = A.RecordName {name; loc}
+let fld_id name = A.FieldName {name; loc}
+let str s = A.String {string = s; loc}
+let nil_ = A.Nil {loc}
+let len_of e = A.LengthOf {expr = e; loc}
+let new_arr tp len = A.Arr {tp; len; loc}
+let new_rec r fields = A.Rcrd {rcrdtp = rec_id r; fields = List.map (fun (f, e) -> (fld_id f, e)) fields; loc}
+let idx_lval arr index = A.Idx {arr; index; loc}
+let fld_lval rcrd field = A.Fld {rcrd; field = fld_id field; loc}
+let idx arr index = A.Lval (idx_lval arr index)
+let fld rcrd field = A.Lval (fld_lval rcrd field)
+let assign_lval lvl rhs = A.Assignment {lvl; rhs; loc}
+let ty_str = A.Str {loc}
+let ty_byte = A.Byte {loc}
+let ty_arr tp = A.Array {typ = tp; loc}
+let ty_rec r = A.Record {recordname = rec_id r}
+let recdecl name fields =
+  A.RecDecl {recname = rec_id name; fields = List.map (fun (f, tp) -> (fld_id f, tp)) fields; loc}
+let fundecl ?(ret=A.RetTyp ty_int) name params body =
+  A.FunDecl {ret; funname = id name; params = List.map (fun (p, tp) -> (id p, tp)) params; body; loc}
+
+let expect_prog_typed prg expected =
+  equal "phase 5 typed program" expected (Semant.typecheck_prog prg)
+
+let expect_prog_errors fragments prg =
+  match Semant.typecheck_prog prg with
+  | _ -> fail "expected a TypeError, but the program was accepted"
+  | exception Semant.TypeError messages ->
+    let shown = String.concat " | " messages in
+    if List.length messages <> List.length fragments then
+      fail (Printf.sprintf "expected %d error(s), got %d: %s"
+              (List.length fragments) (List.length messages) shown);
+    List.iter2
+      (fun fragment message ->
+         if not (contains message fragment) then
+           fail (Printf.sprintf "expected an error containing \"%s\", got: %s" fragment shown))
+      fragments messages
+
+let expect_prog_error fragment prg = expect_prog_errors [fragment] prg
+
+let phase5_tests = [
+  "mutually recursive records and out-of-order fields", (fun () ->
+    let prg = [
+      recdecl "T1" [("x", ty_int); ("t2", ty_rec "T2")];
+      recdecl "T2" [("y", ty_int); ("t1", ty_rec "T1")];
+      fundecl "main" [] [
+        decls [decl ~tp:(ty_rec "T2") "a" (new_rec "T2" [("t1", nil_); ("y", int 10)])];
+        ret (fld (var "a") "y")
+      ]
+    ] in
+    let expected = [
+      T.RecDecl {recname = T.RecordName {sym = Symbol.symbol "T1"};
+                 fields = [(T.FieldName {sym = Symbol.symbol "x"}, T.Int);
+                           (T.FieldName {sym = Symbol.symbol "t2"}, T.Record (T.RecordName {sym = Symbol.symbol "T2"}))]};
+      T.RecDecl {recname = T.RecordName {sym = Symbol.symbol "T2"};
+                 fields = [(T.FieldName {sym = Symbol.symbol "y"}, T.Int);
+                           (T.FieldName {sym = Symbol.symbol "t1"}, T.Record (T.RecordName {sym = Symbol.symbol "T1"}))]};
+      T.FunDecl {funname = tid "main"; ret = T.RetTyp T.Int; params = []; body = [
+        tdecls [tdecl "a" (T.Record (T.RecordName {sym = Symbol.symbol "T2"}))
+                  (T.Rcrd {recname = T.RecordName {sym = Symbol.symbol "T2"};
+                           fields = [(T.FieldName {sym = Symbol.symbol "t1"}, T.Nil);
+                                     (T.FieldName {sym = Symbol.symbol "y"}, tint 10)]})];
+        tret (T.Lval (T.Fld {rcrd = tvar "a" (T.Record (T.RecordName {sym = Symbol.symbol "T2"}));
+                             recname = T.RecordName {sym = Symbol.symbol "T2"};
+                             field = T.FieldName {sym = Symbol.symbol "y"};
+                             tp = T.Int}))
+      ]}
+    ] in
+    expect_prog_typed prg expected);
+
+  "empty record is allowed", (fun () ->
+    let prg = [
+      recdecl "Empty" [];
+      fundecl "main" [] [decls [decl "e" (new_rec "Empty" [])]; ret (int 0)]
+    ] in
+    ignore (Semant.typecheck_prog prg));
+
+  "reserved record name is rejected", (fun () ->
+    expect_prog_error "record name 'stream' is reserved"
+      [recdecl "stream" [("x", ty_int)]; fundecl "main" [] [ret (int 0)]]);
+
+  "duplicate record name is rejected", (fun () ->
+    expect_prog_error "record 'Pair' is declared more than once"
+      [recdecl "Pair" [("x", ty_int)]; recdecl "Pair" [("y", ty_int)];
+       fundecl "main" [] [ret (int 0)]]);
+
+  "cannot instantiate reserved record with new", (fun () ->
+    expect_error "cannot instantiate reserved record type 'stream' with 'new'"
+      (program [decls [decl ~tp:(ty_rec "stream") "s" (new_rec "stream" [])]]));
+
+  "duplicate field in record declaration is rejected", (fun () ->
+    expect_prog_error "duplicate field 'x' in record 'Pair'"
+      [recdecl "Pair" [("x", ty_int); ("x", ty_bool)];
+       fundecl "main" [] [ret (int 0)]]);
+
+  "unknown record field type is rejected once", (fun () ->
+    expect_prog_error "unknown record type 'Ghost'"
+      [recdecl "Wrapper" [("g", ty_rec "Ghost")]; fundecl "main" [] [ret (int 0)]]);
+
+  "missing field init in new record is rejected", (fun () ->
+    expect_prog_error "missing initialization for field 'y' of record 'Pair'"
+      [recdecl "Pair" [("x", ty_int); ("y", ty_int)];
+       fundecl "main" [] [decls [decl "p" (new_rec "Pair" [("x", int 1)])]; ret (int 0)]]);
+
+  "duplicate and unknown field init are rejected", (fun () ->
+    expect_prog_errors
+      ["field 'x' initialized more than once"; "record 'Pair' has no field 'z'"]
+      [recdecl "Pair" [("x", ty_int)];
+       fundecl "main" [] [decls [decl "p" (new_rec "Pair" [("x", int 1); ("x", int 2); ("z", int 3)])];
+                          ret (int 0)]]);
+
+  "record equality with same type and nil succeeds; different records rejected", (fun () ->
+    let valid_prg = [
+      recdecl "Pair" [("x", ty_int)];
+      fundecl "main" [] [
+        decls [decl "p" (new_rec "Pair" [("x", int 1)]);
+               decl ~tp:(ty_rec "Pair") "q" nil_;
+               decl "b1" (bin (var "p") op_eq nil_);
+               decl "b2" (bin nil_ op_neq (var "q"));
+               decl "b3" (bin (var "p") op_eq (var "q"))];
+        ret (int 0)
+      ]
+    ] in
+    ignore (Semant.typecheck_prog valid_prg);
+    expect_prog_error "operator '==' cannot be applied"
+      [recdecl "A" [("x", ty_int)]; recdecl "B" [("x", ty_int)];
+       fundecl "main" [] [
+         decls [decl "a" (new_rec "A" [("x", int 1)]); decl "b" (new_rec "B" [("x", int 1)])];
+         decls [decl "eq" (bin (var "a") op_eq (var "b"))];
+         ret (int 0)
+       ]]);
+
+  "unannotated nil and nil field access are rejected", (fun () ->
+    expect_error "cannot infer type of 'nil'" (program [decls [decl "x" nil_]]);
+    expect_error "field access requires a record type, but found nil" [ret (fld nil_ "x")]);
+
+  "record field assignment works", (fun () ->
+    let prg = [
+      recdecl "Box" [("v", ty_int)];
+      fundecl "main" [] [
+        decls [decl "b" (new_rec "Box" [("v", int 1)])];
+        expr (assign_lval (fld_lval (var "b") "v") (int 99));
+        ret (fld (var "b") "v")
+      ]
+    ] in
+    ignore (Semant.typecheck_prog prg));
+
+  "arrays: creation, indexing, assignment, length_of, equality", (fun () ->
+    let prg = [
+      fundecl "main" [] [
+        decls [decl "arr" (new_arr ty_int (int 5));
+               decl "n" (len_of (var "arr"));
+               decl "same" (bin (var "arr") op_eq (var "arr"))];
+        expr (assign_lval (idx_lval (var "arr") (int 0)) (int 42));
+        ret (idx (var "arr") (int 0))
+      ]
+    ] in
+    ignore (Semant.typecheck_prog prg));
+
+  "array errors: non-int length, non-int index, indexing non-array, mismatched equality", (fun () ->
+    expect_error "type mismatch in array length" (program [decls [decl "a" (new_arr ty_int (bool true))]]);
+    expect_error "type mismatch in array index"
+      (program [decls [decl "a" (new_arr ty_int (int 2))]; ret (idx (var "a") (bool false))]);
+    expect_error "indexing requires an array type, but found int"
+      (program [decls [decl "x" (int 1)]; ret (idx (var "x") (int 0))]);
+    expect_error "operator '==' cannot be applied"
+      (program [decls [decl "a" (new_arr ty_int (int 1)); decl "b" (new_arr ty_bool (int 1));
+                       decl "c" (bin (var "a") op_eq (var "b"))]]));
+
+  "strings: literals, comparisons, length_of, stdlib calls, arithmetic rejected", (fun () ->
+    let prg = [
+      fundecl "main" [] [
+        decls [decl "s1" (str "hello");
+               decl "s2" (call "string_concat" [var "s1"; str " world"]);
+               decl "cmp" (bin (var "s1") op_lt (var "s2"));
+               decl "len" (len_of (var "s2"));
+               decl "b" (call "int_to_byte_unsigned" [int 65]);
+               decl "out" (call "get_stdout" [])];
+        expr (call "output_string" [var "s2"; var "out"]);
+        ret (var "len")
+      ]
+    ] in
+    ignore (Semant.typecheck_prog prg);
+    expect_error "operator '+' cannot be applied to operands of type string and string"
+      [ret (bin (str "a") op_plus (str "b"))];
+    expect_error "'length_of' requires an array or string, but found int"
+      [ret (len_of (int 5))];
+    expect_error "unbound identifier 'compare_strings'"
+      [ret (call "compare_strings" [str "a"; str "b"])])
+]
+
 let tests = declarations_tests @ arithmetic_tests @ comparison_tests @ boolean_tests
   @ expression_tests @ branch_tests @ loop_tests @ program_tests @ void_clause_tests
-  @ error_collection_tests
+  @ error_collection_tests @ phase5_tests
 
 let () =
   let passed = ref 0 and failed = ref 0 in

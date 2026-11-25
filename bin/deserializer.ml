@@ -1,6 +1,22 @@
 (* -- Use this in your solution without modifications *)
-
 open Ppx_yojson_conv_lib.Yojson_conv.Primitives
+
+let recordname_of_yojson =
+  function
+  | `List [`String "RecordName"; `Assoc bnds] ->
+    let name_field = string_of_yojson (List.assoc "name" bnds) in
+    let loc_field = Location.location_of_yojson (List.assoc "loc" bnds) in
+    Ast.RecordName { name = name_field ; loc = loc_field}
+  | _ -> failwith (Printf.sprintf "Ill-formed recordname JSON")
+
+
+let fieldname_of_yojson =
+  function
+  | `List [`String "FieldName"; `Assoc bnds] ->
+    let name_field = string_of_yojson (List.assoc "name" bnds) in
+    let loc_field = Location.location_of_yojson (List.assoc "loc" bnds) in
+    Ast.FieldName { name = name_field ; loc = loc_field}
+  | _ -> failwith (Printf.sprintf "Ill-formed fieldname JSON")
 
 let ident_of_yojson =
   function
@@ -10,7 +26,7 @@ let ident_of_yojson =
     Ast.Ident { name = name_field ; loc = loc_field}
   | _ -> failwith (Printf.sprintf "Ill-formed ident JSON")
 
-let typ_of_yojson =
+let rec typ_of_yojson =
   function
   | `List (`String "Int"::`Assoc bnds::_) ->
     let loc_field = Location.location_of_yojson (List.assoc "loc" bnds) in
@@ -18,8 +34,20 @@ let typ_of_yojson =
   | `List (`String "Bool"::`Assoc bnds::_) ->
     let loc_field = Location.location_of_yojson (List.assoc "loc" bnds) in
     Ast.Bool { loc = loc_field }
+  | `List (`String "Str"::`Assoc bnds::_) ->
+    let loc_field = Location.location_of_yojson (List.assoc "loc" bnds) in
+    Ast.Str { loc = loc_field }
+  | `List (`String "Byte"::`Assoc bnds::_) ->
+    let loc_field = Location.location_of_yojson (List.assoc "loc" bnds) in
+    Ast.Byte { loc = loc_field }
+  | `List (`String "Array"::`Assoc bnds::_) ->
+    let typ_field = typ_of_yojson (List.assoc "typ" bnds) in
+    let loc_field = Location.location_of_yojson (List.assoc "loc" bnds) in
+    Ast.Array { typ = typ_field ; loc = loc_field }
+  | `List (`String "Record"::`Assoc bnds::_) ->
+    let recordname_field = recordname_of_yojson (List.assoc "recordname" bnds) in
+    Ast.Record { recordname = recordname_field }
   | _ -> failwith (Printf.sprintf "Ill-formed typ JSON")
-
 
 let rettyp_of_yojson =
   function
@@ -94,6 +122,10 @@ let rec expr_of_yojson =
     let bool_field = bool_of_yojson (List.assoc "bool" bnds) in
     let loc_field = Location.location_of_yojson (List.assoc "loc" bnds) in
     Ast.Boolean { bool = bool_field ; loc = loc_field }
+  | `List [`String "String" ; `Assoc bnds] ->
+    let string_field = string_of_yojson (List.assoc "string" bnds) in
+    let loc_field = Location.location_of_yojson (List.assoc "loc" bnds) in
+    Ast.String { string = string_field ; loc = loc_field }
   | `List [`String "BinOp" ; `Assoc bnds] ->
     let left_field = expr_of_yojson (List.assoc "left" bnds) in
     let op_field = binop_of_yojson (List.assoc "op" bnds) in
@@ -105,6 +137,10 @@ let rec expr_of_yojson =
     let operand_field = expr_of_yojson (List.assoc "operand" bnds) in
     let loc_field = Location.location_of_yojson (List.assoc "loc" bnds) in
     Ast.UnOp { op = op_field ; operand = operand_field ; loc = loc_field }
+  | `List [`String "LengthOf" ; `Assoc bnds] ->
+    let expr_field = expr_of_yojson (List.assoc "expr" bnds) in
+    let loc_field = Location.location_of_yojson (List.assoc "loc" bnds) in
+    Ast.LengthOf { expr = expr_field ; loc = loc_field }
   | `List [`String "Lval" ; lval_lval_arg] ->
     let lval_arg = lval_of_yojson lval_lval_arg in
     Ast.Lval lval_arg
@@ -113,6 +149,23 @@ let rec expr_of_yojson =
     let rhs_field = expr_of_yojson (List.assoc "rhs" bnds) in
     let loc_field = Location.location_of_yojson (List.assoc "loc" bnds) in
     Ast.Assignment { lvl = lvl_field ; rhs = rhs_field ; loc = loc_field }
+  | `List [`String "Rcrd" ; `Assoc bnds] ->
+    let rcrdtp_field = recordname_of_yojson (List.assoc "rcrdtp" bnds) in
+    let fields_field =
+      list_of_yojson
+        (Ppx_yojson_conv_lib.Yojson_conv.pair_of_yojson fieldname_of_yojson expr_of_yojson)
+        (List.assoc "fields" bnds)
+    in
+    let loc_field = Location.location_of_yojson (List.assoc "loc" bnds) in
+    Ast.Rcrd { rcrdtp = rcrdtp_field ; fields = fields_field ; loc = loc_field }
+  | `List [`String "Arr" ; `Assoc bnds] ->
+    let tp_field = typ_of_yojson (List.assoc "tp" bnds) in
+    let len_field = expr_of_yojson (List.assoc "len" bnds) in
+    let loc_field = Location.location_of_yojson (List.assoc "loc" bnds) in
+    Ast.Arr { tp =  tp_field ; len = len_field ; loc = loc_field }
+  | `List [`String "Nil" ; `Assoc bnds] ->
+    let loc_field = Location.location_of_yojson (List.assoc "loc" bnds) in
+    Ast.Nil { loc = loc_field }
   | `List [`String "Call" ; `Assoc bnds] ->
     let fname_field = ident_of_yojson (List.assoc "fname" bnds) in
     let args_field = list_of_yojson expr_of_yojson (List.assoc "args" bnds) in
@@ -129,6 +182,16 @@ and lval_of_yojson =
   | `List [`String "Var" ; var_ident_arg] ->
     let ident_arg = ident_of_yojson var_ident_arg in
     Ast.Var ident_arg
+  | `List [`String "Idx" ; `Assoc bnds] ->
+    let arr_field = expr_of_yojson (List.assoc "arr" bnds) in
+    let index_field = expr_of_yojson (List.assoc "index" bnds) in
+    let loc_field = Location.location_of_yojson (List.assoc "loc" bnds) in
+    Ast.Idx { arr = arr_field ; index = index_field ; loc = loc_field }
+  | `List [`String "Fld" ; `Assoc bnds] ->
+    let rcrd_field = expr_of_yojson (List.assoc "rcrd" bnds) in
+    let field_field = fieldname_of_yojson (List.assoc "field" bnds) in
+    let loc_field = Location.location_of_yojson (List.assoc "loc" bnds) in
+    Ast.Fld { rcrd = rcrd_field ; field = field_field ; loc = loc_field }
   | _ -> failwith (Printf.sprintf "Ill-formed lval JSON")
 
 let single_declaration_of_yojson =
@@ -224,11 +287,27 @@ let fundecl_of_yojson =
     { Ast.ret = ret_field ; Ast.funname = funname_field ; Ast.params = params_field ; Ast.body = body_field ; Ast.loc = loc_field }
   | _ -> failwith (Printf.sprintf "Ill-formed fundecl JSON")
 
+let recdecl_of_yojson =
+  function
+  | `Assoc bnds ->
+    let recname_field = recordname_of_yojson (List.assoc "recname" bnds) in
+    let fields_field =
+      list_of_yojson
+        (Ppx_yojson_conv_lib.Yojson_conv.pair_of_yojson fieldname_of_yojson typ_of_yojson)
+        (List.assoc "fields" bnds)
+    in
+    let loc_field = Location.location_of_yojson (List.assoc "loc" bnds) in
+    { Ast.recname = recname_field ; Ast.fields = fields_field ; Ast.loc = loc_field }
+  | _ -> failwith (Printf.sprintf "Ill-formed recdecl JSON")
+
 let program_fragment_of_yojson =
   function
   | `List [`String "FunDecl"; fundecl_fundecl_arg] ->
     let fundecl_arg = fundecl_of_yojson fundecl_fundecl_arg in
     Ast.FunDecl fundecl_arg
+  | `List [`String "RecDecl"; recdecl_recdecl_arg] ->
+    let recdecl_arg = recdecl_of_yojson recdecl_recdecl_arg in
+    Ast.RecDecl recdecl_arg
   | _ -> failwith (Printf.sprintf "Ill-formed program_fragment JSON")
 
 let program_of_yojson =

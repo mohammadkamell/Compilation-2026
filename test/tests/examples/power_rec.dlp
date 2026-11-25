@@ -1,0 +1,21 @@
+void printInt(i : int){
+   output_string(int_to_string(i),get_stdout());
+   output_string("\n",get_stdout());
+}
+
+int power(a: int, n: int) {
+    if (n <= 0)
+      return 1;
+    var r = power(a, n / 2);
+    r = r * r;
+    if (n % 2 != 0)
+      r = r * a;
+    return r;
+}
+
+
+int main() {
+    printInt(power(2, 4)); 
+    printInt(power(6, 3)); 
+    return 0;
+}

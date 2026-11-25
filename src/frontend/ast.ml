@@ -1,11 +1,20 @@
 (* -- Use this in your solution without modifications *)
+
 module Loc = Location
+
+type recordname = RecordName of {name : string; loc : Loc.location}
+
+type fieldname = FieldName of {name : string; loc : Loc.location}
 
 type ident = Ident of {name : string; loc : Loc.location}
 
 type typ =
 | Int of {loc : Loc.location}
 | Bool of {loc : Loc.location}
+| Str of {loc : Loc.location}
+| Byte of {loc : Loc.location}
+| Array of {typ : typ; loc : Loc.location}
+| Record of {recordname : recordname}
 
 type rettyp =
 | Void of {loc : Loc.location}
@@ -33,18 +42,26 @@ type unop =
 type expr =
 | Integer of {int : int64; loc : Loc.location}
 | Boolean of {bool : bool; loc : Loc.location}
+| String of {string : string; loc : Loc.location}
 | BinOp of {left : expr; op : binop; right : expr; loc : Loc.location}
 | UnOp of {op : unop; operand : expr; loc : Loc.location}
+| LengthOf of {expr : expr; loc : Loc.location}
 | Lval of lval
 | Assignment of {lvl : lval; rhs : expr; loc : Loc.location}
-| Call of {fname : ident; args : expr list; loc : Loc.location}
+| Rcrd of {rcrdtp : recordname; fields : (fieldname * expr) list; loc : Loc.location}
+| Arr of {tp : typ; len : expr; loc : Loc.location}
+| Nil of {loc : Loc.location}
 | CommaExpr of {left : expr; right : expr; loc : Loc.location}
+| Call of {fname : ident; args : expr list; loc : Loc.location}
 and lval =
 | Var of ident
+| Idx of {arr : expr; index : expr; loc : Loc.location}
+| Fld of {rcrd : expr; field : fieldname; loc : Loc.location}
 
 type single_declaration = Declaration of {name : ident; tp : typ option; body : expr; loc : Loc.location}
 
-type declaration_block = DeclBlock of {declarations : single_declaration list; loc : Loc.location}
+type declaration_block =
+| DeclBlock of {declarations : single_declaration list; loc : Loc.location}
 
 type for_init =
 | FIExpr of expr
@@ -63,6 +80,8 @@ type statement =
 
 type fundecl = {ret : rettyp; funname : ident; params : (ident * typ) list; body : statement list; loc : Loc.location}
 
-type program_fragment = FunDecl of fundecl
+type recdecl = {recname : recordname; fields : (fieldname * typ) list; loc : Loc.location}
+
+type program_fragment = FunDecl of fundecl | RecDecl of recdecl
 
 type program = program_fragment list

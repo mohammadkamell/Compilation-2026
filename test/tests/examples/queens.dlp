@@ -1,0 +1,50 @@
+void printInt(i : int){
+   output_string(int_to_string(i),get_stdout());
+   output_string("\n",get_stdout());
+}
+
+int diff(a: int, b: int, c: int) { // a\b\c a&~b&~c
+    if (a == 0) return 0;
+    var z = 0;
+    if (a%2==1 && b%2==0 && c%2==0)
+        z = 1;
+    else
+        z = 0;
+    return 2 * diff(a/2, b/2, c/2) + z;
+}
+int lowest_bit(x: int) {
+    if (x == 1) return 1;
+    return 2 * lowest_bit(x / 2);
+}
+
+int t(a: int, b: int, c: int) {
+    var f = 1;
+    if (a > 0) {
+        f = 0;
+        var e = diff(a, b, c);
+        while (e > 0) {
+            var d = lowest_bit(e);
+            f = f + t(a-d, (b+d)*2, (c+d)/2);
+            e = e - d;
+        }
+    };
+    return f;
+}
+
+int low_bits(n: int) {
+    if (n == 0) return 0;
+    return 2 * low_bits(n-1) + 1;
+}
+
+int q(n: int) {
+    return t(low_bits(n), 0, 0);
+}
+
+int main() {
+    var n = 1;
+    while (n <= 10) {
+        printInt(q(n)); 
+        n = n+1;
+    };
+    return 0;
+}

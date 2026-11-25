@@ -1,0 +1,3 @@
+(executables
+ (names test_strings test_records test_arrays)
+ (libraries backend ir util))

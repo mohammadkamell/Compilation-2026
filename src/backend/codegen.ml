@@ -4,6 +4,59 @@ module B = CfgBuilder
 module Sym = Symbol
 
 
+(* ---------------------------------------------- 
+   Runtime and standard library (phase 5)
+   ---------------------------------------------- *)
+let ptr = L.Ptr (* printed as "ptr": LLVM pointers are untyped *)
+
+(* Signatures of all external functions: *)
+let external_functions : (string * L.fty) list = [
+  (* runtime *)
+  "compare_strings",                        ([ptr; ptr], L.I64);
+  "allocate_record",                        ([L.I32], ptr);
+  "raw_allocate_on_heap",                   ([L.I32], ptr);
+  "allocate_array",                         ([L.I32; L.I64; ptr], ptr);
+  "report_error_array_index_out_of_bounds", ([], L.Void);
+  "report_error_nil_access",                ([], L.Void);
+  "report_error_division_by_zero",          ([], L.Void);
+  (* standard library *)
+  "bytes_array_to_string", ([ptr], ptr);
+  "string_to_bytes_array", ([ptr], ptr);
+  "byte_to_int_unsigned",  ([L.I8], L.I64);
+  "byte_to_int_signed",    ([L.I8], L.I64);
+  "int_to_byte_unsigned",  ([L.I64], L.I8);
+  "int_to_byte_signed",    ([L.I64], L.I8);
+  "ascii_ord",             ([ptr], L.I64);
+  "ascii_chr",             ([L.I64], ptr);
+  "string_concat",         ([ptr; ptr], ptr);
+  "substring",             ([ptr; L.I64; L.I64], ptr);
+  "int_to_string",         ([L.I64], ptr);
+  "string_to_int",         ([ptr], L.I64);
+  "input_byte",            ([ptr], L.I64);
+  "output_byte",           ([L.I8; ptr], L.I1);
+  "input_bytes_array",     ([L.I64; ptr], ptr);
+  "output_bytes_array",    ([ptr; ptr], L.Void);
+  "output_string",         ([ptr; ptr], L.Void);
+  "seek_in_file",          ([L.I64; L.I1; ptr], L.I1);
+  "pos_in_file",           ([ptr], L.I64);
+  "close_file",            ([ptr], L.I1);
+  "flush_file",            ([ptr], L.I1);
+  "error_in_file",         ([ptr], L.I1);
+  "end_of_file",           ([ptr], L.I1);
+  "get_eof",               ([], L.I64);
+  "open_file",             ([ptr; ptr], ptr);
+  "get_stdin",             ([], ptr);
+  "get_stderr",            ([], ptr);
+  "get_stdout",            ([], ptr);
+  "get_cmd_args",          ([], ptr);
+  "exit",                  ([L.I64], L.Void);
+  (* kept from earlier phases (still in stdlib.c) *)
+  "print_integer",         ([L.I64], L.Void);
+  "read_integer",          ([], L.I64);
+]
+
+
+
 (* Environment : Maps a source variavble to register + llvm type*)
 type env = (L.uid * L.ty) Sym.Table.t
 let empty_env : env = Sym.Table.empty
@@ -14,19 +67,39 @@ let fresh (prefix : string ) : Sym.symbol =
   incr counter;
   Sym.symbol (prefix ^"_"^ string_of_int !counter)
 
-(* Name resolution for functions in LLVM *)
+(* Global data (string literals) collected during code generation. *)
+let globals : (L.gid * L.gdecl) list ref = ref []
+
+
+(* Records: name -> fields (name, type) in declaration order.
+   Filled from the RecDecls at the start of codegen_prog. *)
+let records : (string, (string * T.typ) list) Hashtbl.t = Hashtbl.create 16
+
+let record_tid (s : Sym.symbol) : L.tid = Sym.symbol ("dolphin_record_" ^ Sym.name s)
+
+(* Index and type of a field: the index is its position in the declaration. *)
+let field_info (T.RecordName {sym = r}) (T.FieldName {sym = f}) : int * T.typ =
+  let rec find i = function
+    | [] -> failwith ("Codegen: unknown field " ^ Sym.name f)
+    | (name, tp) :: rest -> if name = Sym.name f then (i, tp) else find (i + 1) rest
+  in
+  find 0 (Hashtbl.find records (Sym.name r))
+
+(* External functions keep their C names; all Dolphin functions, including
+   main, get the prefix dolphin_fun_ (the runtime calls dolphin_fun_main). *)
 let llvm_fun_name (name : string) : string =
-  match name with
-  | "main" -> "dolphin_main"
-  | "print_integer" | "read_integer" | "dolphin_div_by_zero" -> name
-  | _ -> "dolphin_fun_" ^ name
+  if List.mem_assoc name external_functions then name
+  else "dolphin_fun_" ^ name
 
 
 (* Type mapping (bottom up approach)*)
-let ll_type_of_typ (tp: T.typ) : L.ty = 
-  match tp with 
+let ll_type_of_typ (tp: T.typ) : L.ty =
+  match tp with
   | T.Int -> L.I64
   | T.Bool -> L.I1
+  | T.Byte -> L.I8
+  (* strings, arrays and records are all represented by pointers *)
+  | T.Str | T.Array _ | T.Record _ | T.NilType -> L.Ptr
   | T.ErrorType -> failwith "Codegen: ErrorType reached codegen (bug in semant)"
 
 let ll_type_of_rettyp (rt : T.rettyp) : L.ty = 
@@ -65,9 +138,73 @@ let rec type_of_expr (e : T.expr) : T.rettyp =
   | T.Assignment {tp; _} -> T.RetTyp tp
   | T.Call {tp; _} -> tp
   | T.CommaExpr {tp; _} -> T.RetTyp tp
+  | T.String _ -> T.RetTyp T.Str
+  | T.LengthOf _ -> T.RetTyp T.Int
+  | T.Rcrd {recname; _} -> T.RetTyp (T.Record recname)
+  | T.Arr {elemtp; _} -> T.RetTyp (T.Array elemtp)
+  | T.Nil -> T.RetTyp T.NilType
 and type_of_lval (l : T.lval) : T.rettyp =
   match l with
   | T.Var {tp; _} -> T.RetTyp tp
+  | T.Idx {tp; _} | T.Fld {tp; _} -> T.RetTyp tp
+
+
+(* Emits a check that pointer p is not nil; if it is, report a runtime error.
+   Returns the builder positioned in the block where p is known to be non-nil. *)
+let check_not_nil (p : L.operand) (b : B.cfg_builder) : B.cfg_builder =
+  let is_nil = fresh "is_nil" in
+  let b1 = B.add_insn (Some is_nil, L.Icmp (L.Eq, L.Ptr, p, L.Null)) b in
+  let err_lbl = fresh "nil_error" in
+  let ok_lbl = fresh "nil_ok" in
+  let b2 = B.term_block (L.Cbr (L.Id is_nil, err_lbl, ok_lbl)) b1 in
+  let b3 = B.start_block err_lbl b2 in
+  let b4 = B.add_insn (None, L.Call (L.Void, L.Gid (Sym.symbol "report_error_nil_access"), [])) b3 in
+  let b5 = B.term_block L.Unreachable b4 in
+  B.start_block ok_lbl b5
+
+(* Size in bytes of an LLVM type, computed by LLVM itself (GEP size hack). *)
+let size_of (ty : L.ty) (b : B.cfg_builder) : B.cfg_builder * L.operand =
+  let size_ptr = fresh "size_ptr" in
+  let b1 = B.add_insn (Some size_ptr, L.Gep (ty, L.Null, [L.IConst32 1l])) b in
+  let size = fresh "size" in
+  let b2 = B.add_insn (Some size, L.Ptrtoint (L.Id size_ptr, L.I32)) b1 in
+  (b2, L.Id size)
+
+
+(* The default value of array elements of the given type. *)
+let default_value (tp : T.typ) : L.operand =
+  match tp with
+  | T.Int -> L.IConst64 0L
+  | T.Bool -> L.IConst1 false
+  | T.Byte -> L.IConst8 '\000'
+  | T.Str -> L.Gid (Sym.symbol "dolphin_rc_empty_string")
+  | T.Array _ | T.Record _ | T.NilType -> L.Null
+  | T.ErrorType -> failwith "Codegen: ErrorType reached codegen (bug in semant)"
+
+
+(* Emits a check that 0 <= i < length of array p; otherwise reports a runtime error. *)
+let check_bounds (p : L.operand) (i : L.operand) (b : B.cfg_builder) : B.cfg_builder =
+  let len_ptr = fresh "len_ptr" in
+  let b1 = B.add_insn (Some len_ptr,
+             L.Gep (L.Namedt (Sym.symbol "array_type"), p, [L.IConst32 0l; L.IConst32 0l])) b in
+  let len = fresh "len" in
+  let b2 = B.add_insn (Some len, L.Load (L.I64, L.Id len_ptr)) b1 in
+  let too_small = fresh "too_small" in
+  let b3 = B.add_insn (Some too_small, L.Icmp (L.Slt, L.I64, i, L.IConst64 0L)) b2 in
+  let too_big = fresh "too_big" in
+  let b4 = B.add_insn (Some too_big, L.Icmp (L.Sge, L.I64, i, L.Id len)) b3 in
+  let out = fresh "out_of_bounds" in
+  let b5 = B.add_insn (Some out, L.Binop (L.Or, L.I1, L.Id too_small, L.Id too_big)) b4 in
+  let err_lbl = fresh "bounds_error" in
+  let ok_lbl = fresh "bounds_ok" in
+  let b6 = B.term_block (L.Cbr (L.Id out, err_lbl, ok_lbl)) b5 in
+  let b7 = B.start_block err_lbl b6 in
+  let b8 = B.add_insn (None, L.Call (L.Void,
+             L.Gid (Sym.symbol "report_error_array_index_out_of_bounds"), [])) b7 in
+  let b9 = B.term_block L.Unreachable b8 in
+  B.start_block ok_lbl b9
+
+
 
 let rec trans_expr (env: env) (e: T.expr) (b: B.cfg_builder) : B.cfg_builder * L.operand = 
   match e with 
@@ -84,10 +221,21 @@ let rec trans_expr (env: env) (e: T.expr) (b: B.cfg_builder) : B.cfg_builder * L
      | T.Lt | T.Le | T.Gt | T.Ge | T.Eq | T.NEq ->
          let (b1, o1) = trans_expr env left b in
          let (b2, o2) = trans_expr env right b1 in
-         let operand_ty = ll_type_of_rettyp (type_of_expr left) in
-         let temp = fresh "temp" in
-         let b3 = B.add_insn (Some temp, L.Icmp (ll_cnd_of_binop op, operand_ty, o1, o2)) b2 in
-         (b3, L.Id temp)
+         (match type_of_expr left with
+          | T.RetTyp T.Str ->
+              (* strings are compared by value: a op b  <=>  compare_strings(a, b) op 0 *)
+              let c = fresh "cmp" in
+              let b3 = B.add_insn (Some c,
+                         L.Call (L.I64, L.Gid (Sym.symbol "compare_strings"), [(L.Ptr, o1); (L.Ptr, o2)])) b2 in
+              let temp = fresh "temp" in
+              let b4 = B.add_insn (Some temp, L.Icmp (ll_cnd_of_binop op, L.I64, L.Id c, L.IConst64 0L)) b3 in
+              (b4, L.Id temp)
+          | lt ->
+              (* ints, bools, bytes; records, arrays and nil compare as pointers *)
+              let temp = fresh "temp" in
+              let b3 = B.add_insn (Some temp,
+                         L.Icmp (ll_cnd_of_binop op, ll_type_of_rettyp lt, o1, o2)) b2 in
+              (b3, L.Id temp))
      | T.Div | T.Rem -> (* We evaluate lhs then rhs. Afterwards we check if o2 is 0, fail by calling C function*)
          let (b1, o1) = trans_expr env left b in 
          let (b2, o2) = trans_expr env right b1 in 
@@ -98,8 +246,7 @@ let rec trans_expr (env: env) (e: T.expr) (b: B.cfg_builder) : B.cfg_builder * L
          let b4 = B.term_block (L.Cbr (L.Id is_zero, err_lbl, ok_lbl)) b3 in
          (* Error block *)
          let b5 = B.start_block err_lbl b4 in
-         let b6 = B.add_insn (None, L.Call (L.Void, L.Gid (Sym.symbol "dolphin_div_by_zero"), [])) b5 in
-         let b7 = B.term_block L.Unreachable b6 in
+         let b6 = B.add_insn (None, L.Call (L.Void, L.Gid (Sym.symbol "report_error_division_by_zero"), [])) b5 in         let b7 = B.term_block L.Unreachable b6 in
          (* Ok block *)
          let b8 = B.start_block ok_lbl b7 in
          let temp = fresh "temp" in 
@@ -154,16 +301,66 @@ let rec trans_expr (env: env) (e: T.expr) (b: B.cfg_builder) : B.cfg_builder * L
       let (b1, _) = trans_expr env left b in
       let (b2, o2) = trans_expr env right b1 in
       (b2, o2)
-  |T.Lval (T.Var {ident = T.Ident {sym}; _}) -> 
-      let (slot, llty) = Sym.Table.find sym env in 
-      let temp = fresh "temp" in 
-      let b1 = B.add_insn (Some temp, L.Load (llty, L.Id slot)) b in 
-      (b1, L.Id temp)
-  | T.Assignment {lvl = T.Var {ident = T.Ident {sym}; _}; rhs; _} ->
-      let (b1, o) = trans_expr env rhs b in 
-      let (slot, llty) = Sym.Table.find sym env in
-      let b2 = B.add_insn (None, L.Store (llty, o, L.Id slot )) b1 in
-      (b2, o) 
+  | T.Lval lvl ->
+      let (b1, addr, llty) = trans_lval_addr env lvl b in
+      let temp = fresh "temp" in
+      let b2 = B.add_insn (Some temp, L.Load (llty, addr)) b1 in
+      (b2, L.Id temp)
+  | T.Assignment {lvl; rhs; _} ->
+      (* address first, then the value: left-to-right evaluation *)
+      let (b1, addr, llty) = trans_lval_addr env lvl b in
+      let (b2, o) = trans_expr env rhs b1 in
+      let b3 = B.add_insn (None, L.Store (llty, o, addr)) b2 in
+      (b3, o)
+  | T.String {string} ->
+      let g = fresh "string_literal" in
+      let n = String.length string in
+      let ty = L.Struct [L.I64; L.Array (n, L.I8)] in
+      let init = L.GStruct [ (L.I64, L.GInt n); (L.Array (n, L.I8), L.GString string) ] in
+      globals := (g, (ty, init)) :: !globals;
+      (b, L.Gid g)
+  | T.LengthOf {expr} ->
+      let (b1, p) = trans_expr env expr b in
+      (* arrays may be nil; strings never are *)
+      let b2 = (match type_of_expr expr with
+                | T.RetTyp (T.Array _) -> check_not_nil p b1
+                | _ -> b1) in
+      let len_ptr = fresh "len_ptr" in
+      let b3 = B.add_insn (Some len_ptr,
+                 L.Gep (L.Namedt (Sym.symbol "array_type"), p, [L.IConst32 0l; L.IConst32 0l])) b2 in
+      let len = fresh "len" in
+      let b4 = B.add_insn (Some len, L.Load (L.I64, L.Id len_ptr)) b3 in
+      (b4, L.Id len)
+  | T.Nil -> (b, L.Null)
+  | T.Rcrd {recname = (T.RecordName {sym = rsym} as rn); fields} ->
+      let rty = L.Namedt (record_tid rsym) in
+      let (b1, size) = size_of rty b in
+      let p = fresh "record" in
+      let b2 = B.add_insn (Some p,
+                 L.Call (L.Ptr, L.Gid (Sym.symbol "allocate_record"), [(L.I32, size)])) b1 in
+      (* initialize the fields in source order (= evaluation order) *)
+      let b3 = List.fold_left (fun bacc (fname, e) ->
+          let (b', o) = trans_expr env e bacc in
+          let (idx, ftp) = field_info rn fname in
+          let fptr = fresh "field_ptr" in
+          let b'' = B.add_insn (Some fptr,
+                      L.Gep (rty, L.Id p, [L.IConst32 0l; L.IConst32 (Int32.of_int idx)])) b' in
+          B.add_insn (None, L.Store (ll_type_of_typ ftp, o, L.Id fptr)) b'')
+        b2 fields in
+      (b3, L.Id p)
+  | T.Arr {elemtp; len} ->
+    let (b1, n) = trans_expr env len b in
+    let llty = ll_type_of_typ elemtp in
+    let (b2, size) = size_of llty b1 in
+    (* allocate_array needs a pointer to the default element value *)
+    let def = fresh "default" in
+    let b3 = B.add_alloca (def, llty) b2 in
+    let b4 = B.add_insn (None, L.Store (llty, default_value elemtp, L.Id def)) b3 in
+    let p = fresh "array" in
+    let b5 = B.add_insn (Some p,
+                L.Call (L.Ptr, L.Gid (Sym.symbol "allocate_array"),
+                        [(L.I32, size); (L.I64, n); (L.Ptr, L.Id def)])) b4 in
+    (b5, L.Id p)
 and trans_args (env: env) (args: T.expr list) (b : B.cfg_builder) : B.cfg_builder * (L.ty * L.operand) list = 
 match args with 
 | [] -> (b, [])
@@ -172,7 +369,34 @@ match args with
   let ty = ll_type_of_rettyp (type_of_expr arg) in 
   let (b2, rest_ops) = trans_args env rest b1 in 
   (b2, (ty, o) :: rest_ops)
-
+(* The address (lvalue) of an lval, and the LLVM type of the value stored there. *)
+and trans_lval_addr (env : env) (lvl : T.lval) (b : B.cfg_builder)
+    : B.cfg_builder * L.operand * L.ty =
+  match lvl with
+  | T.Var {ident = T.Ident {sym}; _} ->
+      let (slot, llty) = Sym.Table.find sym env in
+      (b, L.Id slot, llty)
+  | T.Fld {rcrd; recname = (T.RecordName {sym = rsym} as rn); field; tp} ->
+      let (b1, p) = trans_expr env rcrd b in
+      let b2 = check_not_nil p b1 in
+      let (idx, _) = field_info rn field in
+      let fptr = fresh "field_ptr" in
+      let b3 = B.add_insn (Some fptr,
+                 L.Gep (L.Namedt (record_tid rsym), p,
+                        [L.IConst32 0l; L.IConst32 (Int32.of_int idx)])) b2 in
+      (b3, L.Id fptr, ll_type_of_typ tp)
+  | T.Idx {arr; index; tp} ->
+      let (b1, p) = trans_expr env arr b in
+      let (b2, i) = trans_expr env index b1 in
+      let b3 = check_not_nil p b2 in
+      let b4 = check_bounds p i b3 in
+      let llty = ll_type_of_typ tp in
+      let contents = fresh "contents" in
+      let b5 = B.add_insn (Some contents,
+                 L.Gep (L.Namedt (Sym.symbol "array_type"), p, [L.IConst32 0l; L.IConst32 1l])) b4 in
+      let elem = fresh "elem_ptr" in
+      let b6 = B.add_insn (Some elem, L.Gep (llty, L.Id contents, [i])) b5 in
+      (b6, L.Id elem, llty)
 
 
 let rec trans_stmt (env: env) (break_lbl: L.lbl) (cont_lbl: L.lbl) (s: T.statement) (b: B.cfg_builder) : env * B.cfg_builder = 
@@ -274,7 +498,7 @@ let rec trans_stmt (env: env) (break_lbl: L.lbl) (cont_lbl: L.lbl) (s: T.stateme
       let b2 = B.start_block (fresh "after_continue") b1 in     
       (env, b2)
 
-let trans_fundecl (T.FunDecl {ret; funname = T.Ident {sym}; params; body}) : Sym.symbol * L.fdecl =
+let trans_fundecl ({ret; funname = T.Ident {sym}; params; body} : T.fundecl) : Sym.symbol * L.fdecl =
   let fn_name = llvm_fun_name (Sym.name sym) in
   let fn_gid = Sym.symbol fn_name in
   let param_tys = List.map (fun (T.Param {typ; _}) -> ll_type_of_typ typ) params in
@@ -313,13 +537,25 @@ let trans_fundecl (T.FunDecl {ret; funname = T.Ident {sym}; params; body}) : Sym
   let cfg = B.get_cfg final_b in
   (fn_gid, { L.fty; param = param_uids; cfg })
 
-let codegen_prog (prog: T.program) : L.prog = 
-  let fdecls = List.map (fun (T.FunDecl _ as fd) -> trans_fundecl fd) prog in 
-  { L.tdecls = [];
-    extgdecls = [];
-    gdecls = []; 
-    extfuns = [ (Sym.symbol "print_integer", ([L.I64], L.Void));
-                (Sym.symbol "read_integer", ([], L.I64));
-                (Sym.symbol "dolphin_div_by_zero", ([], L.Void)) ];
-    fdecls;
-  }
+let codegen_prog (prog: T.program) : L.prog =
+  globals := [];
+  Hashtbl.reset records;
+  let recdecls = List.filter_map (function T.RecDecl r -> Some r | T.FunDecl _ -> None) prog in
+  List.iter (fun ({recname = T.RecordName {sym}; fields} : T.recdecl) ->
+      Hashtbl.replace records (Sym.name sym)
+        (List.map (fun (T.FieldName {sym = f}, tp) -> (Sym.name f, tp)) fields))
+    recdecls;
+  let record_tdecls = List.map (fun ({recname = T.RecordName {sym}; fields} : T.recdecl) ->
+      (record_tid sym, L.Struct (List.map (fun (_, tp) -> ll_type_of_typ tp) fields)))
+    recdecls in
+  let fdecls = List.filter_map (function
+    | T.FunDecl f -> Some (trans_fundecl f)
+    | T.RecDecl _ -> None) prog in 
+    { L.tdecls = (Sym.symbol "dolphin_record_stream", L.Struct [])
+               :: (Sym.symbol "array_type", L.Struct [L.I64; L.Array (0, L.I8)])
+               :: record_tdecls;
+      extgdecls = [ (Sym.symbol "dolphin_rc_empty_string", L.Namedt (Sym.symbol "array_type")) ];
+      gdecls = List.rev !globals;
+      extfuns = List.map (fun (name, fty) -> (Sym.symbol name, fty)) external_functions;
+      fdecls;
+    }

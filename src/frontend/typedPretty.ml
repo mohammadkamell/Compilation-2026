@@ -2,9 +2,14 @@ module Sym = Symbol
 module PBox = PrintBox
 open TypedAst
 
-let typ_to_string = function
+let rec typ_to_string = function
 | Int -> "int"
 | Bool -> "bool"
+| Str -> "string"
+| Byte -> "byte"
+| Array tp -> "[" ^ typ_to_string tp ^ "]"
+| Record (RecordName {sym}) -> Sym.name sym
+| NilType -> "nil"
 | ErrorType -> "'type error'"
 
 let rettyp_to_string = function
@@ -13,13 +18,19 @@ let rettyp_to_string = function
 
 (* producing trees for pretty printing *)
 let ident_to_tree (Ident {sym}) = Pretty.make_ident_line (Sym.name sym)
+let recordname_to_tree (RecordName {sym}) = Pretty.make_typ_line (Sym.name sym)
+let fieldname_to_tree (FieldName {sym}) = Pretty.make_fieldname_line (Sym.name sym)
 
-let typ_to_tree tp =
+let rec typ_to_tree tp =
   match tp with
   | Int -> Pretty.make_typ_line "Int"
   | Bool -> Pretty.make_typ_line "Bool"
+  | Str -> Pretty.make_typ_line "String"
+  | Byte -> Pretty.make_typ_line "Byte"
+  | Array t -> PBox.tree (Pretty.make_typ_line "Array") [typ_to_tree t]
+  | Record r -> recordname_to_tree r
+  | NilType -> Pretty.make_typ_line "NilType"
   | ErrorType -> PBox.line_with_style (PBox.Style.set_bg_color PBox.Style.Red PBox.Style.default) "ErrorType"
-
 
 let rettyp_to_tree = function
 | Void -> Pretty.make_typ_line "Void"
@@ -50,24 +61,39 @@ let rec expr_to_tree e =
   match e with
   | Integer {int; _} -> PBox.hlist ~bars:false [Pretty.make_info_node_line "IntLit("; PBox.line (Int64.to_string int); Pretty.make_info_node_line ")"]
   | Boolean {bool; _} -> PBox.hlist ~bars:false [Pretty.make_info_node_line "BooleanLit("; Pretty.make_keyword_line (if bool then "true" else "false"); Pretty.make_info_node_line ")"]
+  | String {string} -> PBox.hlist ~bars:false [Pretty.make_info_node_line "StringLit("; PBox.line (String.escaped string); Pretty.make_info_node_line ")"]
   | BinOp {left; op; right; tp; _} -> PBox.tree (Pretty.make_info_node_line "BinOp") [typ_to_tree tp; expr_to_tree left; binop_to_tree op; expr_to_tree right]
   | UnOp {op; operand; tp; _} -> PBox.tree (Pretty.make_info_node_line "UnOp") [typ_to_tree tp; unop_to_tree op; expr_to_tree operand]
+  | LengthOf {expr} -> PBox.tree (Pretty.make_info_node_line "LengthOf") [expr_to_tree expr]
   | Lval l -> PBox.tree (Pretty.make_info_node_line "Lval") [lval_to_tree l]
   | Assignment {lvl; rhs; tp; _} -> PBox.tree (Pretty.make_info_node_line "Assignment") [typ_to_tree tp; lval_to_tree lvl; expr_to_tree rhs]
+  | Rcrd {recname; fields} ->
+    PBox.tree (Pretty.make_info_node_line "NewRecord")
+      (recordname_to_tree recname ::
+       List.map (fun (f, v) ->
+         PBox.hlist ~bars:false [fieldname_to_tree f; PBox.line " = "; expr_to_tree v]) fields)
+  | Arr {elemtp; len} ->
+    PBox.tree (Pretty.make_info_node_line "NewArray") [typ_to_tree elemtp; expr_to_tree len]
+  | Nil -> Pretty.make_keyword_line "Nil"
   | Call {fname; args; tp; _} ->
     PBox.tree (Pretty.make_info_node_line "Call")
-      [rettyp_to_tree tp; 
+      [rettyp_to_tree tp;
       PBox.hlist ~bars:false [Pretty.make_info_node_line "FunName: "; ident_to_tree fname];
         PBox.tree (Pretty.make_info_node_line "Args") (List.map (fun e -> expr_to_tree e) args)]
   | CommaExpr {left; right; tp; _} ->
     PBox.tree (Pretty.make_info_node_line "CommaExpr") [typ_to_tree tp; expr_to_tree left; expr_to_tree right]
 and lval_to_tree l =
   match l with
-  | Var {ident; tp} -> PBox.hlist ~bars:false [Pretty.make_info_node_line "Var("; ident_to_tree ident; Pretty.make_info_node_line ")"; PBox.line " : "; typ_to_tree tp;]
+  | Var {ident; tp} -> PBox.hlist ~bars:false [Pretty.make_info_node_line "Var("; ident_to_tree ident; Pretty.make_info_node_line ")"; PBox.line " : "; typ_to_tree tp]
+  | Idx {arr; index; tp} ->
+    PBox.tree (Pretty.make_info_node_line "Index") [typ_to_tree tp; expr_to_tree arr; expr_to_tree index]
+  | Fld {rcrd; recname; field; tp} ->
+    PBox.tree (Pretty.make_info_node_line "Field")
+      [recordname_to_tree recname; fieldname_to_tree field; typ_to_tree tp; expr_to_tree rcrd]
 
 let single_declaration_to_tree (Declaration {name; tp; body; _}) =
-  PBox.tree (Pretty.make_keyword_line "Declaration") 
-    [PBox.hlist ~bars:false [Pretty.make_info_node_line "Ident: "; ident_to_tree name]; 
+  PBox.tree (Pretty.make_keyword_line "Declaration")
+    [PBox.hlist ~bars:false [Pretty.make_info_node_line "Ident: "; ident_to_tree name];
     PBox.hlist ~bars:false [Pretty.make_info_node_line "Type: "; typ_to_tree tp];
     PBox.hlist ~bars:false [Pretty.make_info_node_line "Body: "; expr_to_tree body]]
 
@@ -87,11 +113,11 @@ let rec statement_to_tree c =
       ([PBox.hlist ~bars:false [Pretty.make_info_node_line "Cond: "; expr_to_tree cond]; PBox.hlist ~bars:false [Pretty.make_info_node_line "Then-Branch: "; statement_to_tree thbr]] @
         match elbro with None -> [] | Some elbr -> [PBox.hlist ~bars:false [Pretty.make_info_node_line "Else-Branch: "; statement_to_tree elbr]])
   | WhileStm {cond; body; _} ->
-    PBox.tree (Pretty.make_keyword_line "WhileStm") 
+    PBox.tree (Pretty.make_keyword_line "WhileStm")
       [PBox.hlist ~bars:false [Pretty.make_info_node_line "Cond: "; expr_to_tree cond];
         PBox.hlist ~bars:false [Pretty.make_info_node_line "Body: "; statement_to_tree body]]
   | ForStm {init; cond; update; body; _} ->
-    PBox.tree (Pretty.make_keyword_line "ForStm") 
+    PBox.tree (Pretty.make_keyword_line "ForStm")
       [PBox.hlist ~bars:false [Pretty.make_info_node_line "Init: "; Option.fold ~none:PBox.empty ~some:for_init_to_tree init];
         PBox.hlist ~bars:false [Pretty.make_info_node_line "Cond: "; Option.fold ~none:PBox.empty ~some:expr_to_tree cond];
         PBox.hlist ~bars:false [Pretty.make_info_node_line "Update: "; Option.fold ~none:PBox.empty ~some:expr_to_tree update];
@@ -103,7 +129,7 @@ let rec statement_to_tree c =
   | ReturnStm {ret = None; _} -> Pretty.make_keyword_line "ReturnVoidStm"
 and statement_seq_to_forest stms = List.map statement_to_tree stms
 
-let fundecl_to_tree (FunDecl {ret; funname; params; body; _}) =
+let fundecl_to_tree {ret; funname; params; body} =
   PBox.tree (Pretty.make_keyword_line "FunDecl")
     ([PBox.hlist ~bars:false [Pretty.make_info_node_line "RetType: "; rettyp_to_tree ret];
       PBox.hlist ~bars:false [Pretty.make_info_node_line "Name: "; ident_to_tree funname];
@@ -112,5 +138,15 @@ let fundecl_to_tree (FunDecl {ret; funname; params; body; _}) =
           PBox.hlist ~bars:false [ident_to_tree paramname; PBox.line " : "; typ_to_tree typ]) params)]
     @ statement_seq_to_forest body)
 
+let recdecl_to_tree {recname; fields} =
+  PBox.tree (Pretty.make_keyword_line "RecDecl")
+    (recordname_to_tree recname ::
+     List.map (fun (f, t) ->
+       PBox.hlist ~bars:false [fieldname_to_tree f; PBox.line " : "; typ_to_tree t]) fields)
+
+let program_fragment_to_tree = function
+  | FunDecl f -> fundecl_to_tree f
+  | RecDecl r -> recdecl_to_tree r
+
 let program_to_tree prg =
-  PBox.tree (Pretty.make_info_node_line "Program") (List.map fundecl_to_tree prg)
+  PBox.tree (Pretty.make_info_node_line "Program") (List.map program_fragment_to_tree prg)

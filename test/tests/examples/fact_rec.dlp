@@ -1,0 +1,17 @@
+void printInt(i : int){
+   output_string(int_to_string(i),get_stdout());
+   output_string("\n",get_stdout());
+}
+
+int fact(n: int) {
+    if (n <= 1)
+      return 1;
+    else
+      return n * fact(n-1);
+}
+
+int main() {
+    printInt(fact(5)); 
+    printInt(fact(11)); 
+    return 0;
+}
